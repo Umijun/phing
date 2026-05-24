@@ -114,6 +114,8 @@ interface NoteStore {
   scheduleFlush: (id: string) => void;
   flushNote: (id: string) => Promise<void>;
   flushActiveNote: () => Promise<void>;
+  /** Flush every note that has a pending debounce write — called on app quit. */
+  flushAllPending: () => Promise<void>;
   /** Reload a note from its on-disk file, replacing the in-memory version. */
   reloadNote: (noteId: string) => Promise<void>;
 
@@ -368,6 +370,27 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       flushTimers.delete(selectedNoteId);
     }
     await get().flushNote(selectedNoteId);
+  },
+
+  flushAllPending: async () => {
+    // Collect every note that is either waiting in the debounce queue OR marked
+    // dirty but not yet queued (shouldn't normally happen, but be defensive).
+    const pendingIds = new Set([
+      ...flushTimers.keys(),
+      ...get().dirtyNoteIds,
+    ]);
+    if (!pendingIds.size) return;
+
+    // Cancel all timers first so they don't double-fire after we save.
+    for (const id of pendingIds) {
+      const t = flushTimers.get(id);
+      if (t) { clearTimeout(t); flushTimers.delete(id); }
+    }
+
+    // Flush in parallel — one failure must not block the others.
+    await Promise.allSettled(
+      [...pendingIds].map((id) => get().flushNote(id)),
+    );
   },
 
   reloadNote: async (noteId) => {

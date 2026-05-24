@@ -6,6 +6,8 @@ import { useMindMapStore } from './store/mindMapStore';
 import { isTauri } from './lib/tauri';
 import { encodeNote } from './lib/frontmatter';
 import { vaultWatcher, contentHash } from './lib/fileWatcher';
+import { useNoteStore as noteStoreApi } from './store/noteStore';
+import { useMindMapStore as mindMapStoreApi } from './store/mindMapStore';
 import { findOrphanedTmpFiles, recoverOrphanedTmp } from './lib/recoveryJournal';
 import Sidebar from './components/Sidebar';
 import NoteList from './components/NoteList';
@@ -150,6 +152,31 @@ const App = () => {
 
     return () => { void vaultWatcher.stop(); };
   }, [vaultPath]);
+
+  // ── Flush pending writes on quit ───────────────────────────────────────────
+  // Both stores debounce writes to avoid hammering the disk.  If the user quits
+  // while a debounce is still counting down, the OS tears down the WebView and
+  // the data is lost.  Tauri's onCloseRequested lets us intercept Cmd/Alt-F4 /
+  // the window close button, flush everything, and then actually close.
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    let unlisten: (() => void) | undefined;
+
+    void (async () => {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      unlisten = await getCurrentWindow().onCloseRequested(async (event) => {
+        event.preventDefault(); // hold the close until writes finish
+        await Promise.allSettled([
+          noteStoreApi.getState().flushAllPending(),
+          mindMapStoreApi.getState().flushAllPending(),
+        ]);
+        await getCurrentWindow().destroy();
+      });
+    })();
+
+    return () => { unlisten?.(); };
+  }, []);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

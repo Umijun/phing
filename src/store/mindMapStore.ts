@@ -140,6 +140,9 @@ export interface MindMapStore {
   firstChildId:  (nodeId: string) => string | null;
   prevSiblingId: (nodeId: string) => string | null;
   nextSiblingId: (nodeId: string) => string | null;
+
+  /** Flush all pending debounced saves — called on app quit. */
+  flushAllPending: () => Promise<void>;
 }
 
 // ─── Initial placeholder doc ──────────────────────────────────────────────────
@@ -447,5 +450,31 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
     if (!parent) return null;
     const idx = parent.children.findIndex((c) => c.id === nodeId);
     return idx < parent.children.length - 1 ? parent.children[idx + 1].id : null;
+  },
+
+  flushAllPending: async () => {
+    const vaultPath = getVaultPath();
+    if (!vaultPath || !isTauri() || !saveTimers.size) return;
+
+    // Snapshot pending ids before cancelling timers.
+    const pendingIds = [...saveTimers.keys()];
+
+    // Cancel timers so they don't double-fire.
+    for (const id of pendingIds) {
+      const t = saveTimers.get(id);
+      if (t) { clearTimeout(t); saveTimers.delete(id); }
+    }
+
+    // Save in parallel — one failure must not block the others.
+    const docs = get().mindMaps;
+    await Promise.allSettled(
+      pendingIds.map((id) => {
+        const doc = docs.find((d) => d.id === id);
+        if (!doc) return Promise.resolve();
+        return saveMindMapDoc(vaultPath, doc).catch((e) =>
+          console.error('[phing] flushAllPending (mind map) failed', e),
+        );
+      }),
+    );
   },
 }));
