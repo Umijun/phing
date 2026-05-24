@@ -95,13 +95,34 @@ Crafted with obsessive attention to detail using:
 </details>
 
 ---
+
+## ☕ Support the Project
+Phing is a passion project built during late nights after law lectures. If this app helps you find your focus or brings a little peace to your digital workspace, consider supporting its development!
+
+<div align="center">
+  <a href="https://www.buymeacoffee.com/Umijun" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 50px !important;width: 217px !important;" >
+  </a>
+</div>
+
+<br>
+
+**🇹🇭 สำหรับผู้ใช้งานชาวไทย (PromptPay):**<br>
+หากน้องผิงช่วยให้การจดโน้ตหรือการค้นคว้าของคุณราบรื่นและสงบขึ้น สามารถสนับสนุนค่ากาแฟเล็กๆ น้อยๆ ผ่านการสแกนคิวอาร์โค้ดด้านล่างได้เลยนะคะ ขอบคุณที่เอ็นดูโปรเจกต์นี้ค่ะ 💖
+
+<div align="center">
+  <img src="./assets/promptpay.png" alt="PromptPay QR Code" width="200" />
+</div>
+
+---
+
 ## 🍎 Note for macOS Users
 
 If you encounter a 'damaged and cannot be opened' error when launching the app, this is due to macOS Gatekeeper blocking applications not signed with an Apple Developer Certificate. You can safely bypass this by running the following command in your Terminal:
 
-
+```bash
 xattr -cr /Applications/phing.app
-
+```
 (Please ensure the app is moved to your /Applications folder before running this command.)
 
 ---
