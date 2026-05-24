@@ -6,8 +6,11 @@
  *   2. Nav + Pockets   — flex: 1, scrolls when pocket list overflows
  *   3. Vault + toggle  — fixed bottom, never scrolls
  *
- * Scrollbar is always-reserved (scrollbar-gutter: stable) so the
- * content width never shifts when the scrollbar appears/disappears.
+ * Drag-to-pocket:
+ *   Each pocket item (and "All Notes") carries a data-pocket-id attribute.
+ *   NoteCard's pointer-drag handler uses document.elementsFromPoint to read
+ *   this attribute and set the hovered pocket in useNoteDrag.  Sidebar reads
+ *   that store to render visual feedback — no direct event wiring needed here.
  *
  * British English spelling maintained throughout.
  */
@@ -16,10 +19,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNoteStore, Pocket } from '../store/noteStore';
 import { useVaultStore } from '../store/vaultStore';
-// useNoteStore.getState() used inside drop handlers to avoid stale closures
 import { truncatePath, defaultVaultPath } from '../lib/vaultPaths';
 import { readAvatarFromFile } from '../lib/profileAvatar';
 import { isTauri } from '../lib/tauri';
+import { useNoteDrag } from '../lib/noteDrag';
 import * as vaultService from '../services/vaultService';
 import { mkdir, exists } from '@tauri-apps/plugin-fs';
 import type { AppView } from '../App';
@@ -51,24 +54,22 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
     loadVault,
     createFolder,
     deleteFolder,
-    moveNote,
   } = useNoteStore();
-
-  // ── Drag-and-drop state ────────────────────────────────────────────────────
-  // null  = nothing being dragged over
-  // ''    = "All Notes" drop target active
-  // id    = pocket with that id is the drop target
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const { vaultPath, setVaultPath } = useVaultStore();
+
+  // ── Drag state (read-only in Sidebar — NoteCard writes it) ────────────────
+  const hoveredPocketId = useNoteDrag((s) => s.hoveredPocketId);
+  const isDraggingAny   = useNoteDrag((s) => s.dragging !== null);
+
   const t: LangStrings = lang === 'th' ? i18n.th : i18n.en;
 
   const [vaultOpen,           setVaultOpen]           = useState(false);
   const [newPocketOpen,       setNewPocketOpen]       = useState(false);
   const [newPocketName,       setNewPocketName]       = useState('');
   const [confirmDeletePocket, setConfirmDeletePocket] = useState<string | null>(null);
-  const fileInputRef  = useRef<HTMLInputElement>(null);
-  const nameRef       = useRef<HTMLDivElement>(null);
-  const subtitleRef   = useRef<HTMLDivElement>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+  const nameRef        = useRef<HTMLDivElement>(null);
+  const subtitleRef    = useRef<HTMLDivElement>(null);
   const pocketInputRef = useRef<HTMLInputElement>(null);
 
   const initial = profile.name.trim().charAt(0).toUpperCase() || 'S';
@@ -104,34 +105,6 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
     setNewPocketOpen(false);
   };
 
-  // ── Shared drag-event helpers ──────────────────────────────────────────────
-  const makeDragHandlers = (targetId: string) => ({
-    onDragOver: (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      if (dragOverId !== targetId) setDragOverId(targetId);
-    },
-    onDragLeave: (e: React.DragEvent<HTMLDivElement>) => {
-      // Only clear when truly leaving the element (not entering a child).
-      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-        setDragOverId(null);
-      }
-    },
-    onDrop: (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      setDragOverId(null);
-      const noteId = e.dataTransfer.getData('text/plain');
-      if (!noteId) return;
-      // Read live state to avoid stale closure; skip if already in this pocket.
-      const note = useNoteStore.getState().notes.find((n) => n.id === noteId);
-      if (!note || note.folder === targetId) return;
-      void moveNote(noteId, targetId);
-      // Navigate to the destination pocket so the user can see the drop landed.
-      setActivePocket(targetId);
-      if (targetId !== '') onViewChange?.('notes');
-    },
-  });
-
   const applyVault = async (path: string) => {
     if (isTauri()) {
       if (!(await exists(path))) await mkdir(path, { recursive: true });
@@ -164,8 +137,8 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
 
       <div
         style={{
-          width: 200,
-          height: '100%',
+          width:                200,
+          height:               '100%',
           background:           'var(--sidebar-bg)',
           backdropFilter:       'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
@@ -181,12 +154,12 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
           whileHover={{ background: 'var(--primary-s)' }}
           transition={springHover}
           style={{
-            flexShrink: 0,
-            display:        'flex',
-            alignItems:     'center',
-            gap:            10,
-            padding:        '14px 10px 12px',
-            borderBottom:   '0.5px solid var(--divider)',
+            flexShrink:   0,
+            display:      'flex',
+            alignItems:   'center',
+            gap:          10,
+            padding:      '14px 10px 12px',
+            borderBottom: '0.5px solid var(--divider)',
           }}
         >
           <button
@@ -224,26 +197,26 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
         <div
           className="sidebar-nav-scroll"
           style={{
-            flex:        1,
-            overflowY:   'auto',
-            overflowX:   'hidden',
-            minHeight:   0,
-            paddingTop:  10,
-            paddingBottom: 8,
-            // Reserve scrollbar gutter permanently so content width never
-            // shifts when the scrollbar appears or disappears.
+            flex:            1,
+            overflowY:       'auto',
+            overflowX:       'hidden',
+            minHeight:       0,
+            paddingTop:      10,
+            paddingBottom:   8,
             scrollbarGutter: 'stable',
           }}
         >
           {/* Top nav */}
           <SectionLabel label="Navigation" />
+
+          {/* "All Notes" — drop target for moving notes to root (no pocket) */}
           <NavItem
             label={t.all}
             icon="≡"
             active={activePocket === '' && view !== 'board'}
-            isDropTarget={dragOverId === ''}
+            isDropTarget={isDraggingAny && hoveredPocketId === ''}
+            pocketId=""
             onClick={() => { onViewChange?.('notes'); setActivePocket(''); }}
-            dragHandlers={makeDragHandlers('')}
           />
           <NavItem
             label="Board"
@@ -258,10 +231,10 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
 
           <AnimatePresence initial={false}>
             {pockets.map((p: Pocket) => {
-              const isActive    = activePocket === p.id;
-              const isDeleting  = confirmDeletePocket === p.id;
-              const isDropTarget = dragOverId === p.id;
-              const handlers = makeDragHandlers(p.id);
+              const isActive     = activePocket === p.id;
+              const isDeleting   = confirmDeletePocket === p.id;
+              const isDropTarget = isDraggingAny && hoveredPocketId === p.id;
+
               return (
                 <motion.div
                   key={p.id}
@@ -271,34 +244,33 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
                   transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
                   style={{ overflow: 'hidden' }}
                 >
-                  {/* ── Drop-target spring scale wrapper ──────────────────── */}
+                  {/* Spring-scale wrapper — pocket breathes when hovered during drag */}
                   <motion.div
                     animate={{ scale: isDropTarget ? 1.025 : 1 }}
                     transition={{ type: 'spring', stiffness: 600, damping: 35 }}
                     style={{ transformOrigin: 'left center' }}
                   >
                     <motion.div
+                      // ── data-pocket-id is read by NoteCard's elementsFromPoint ──
+                      data-pocket-id={p.id}
                       whileHover={{
                         background: isActive ? 'var(--primary-g)' : 'var(--primary-s)',
                         color:      'var(--primary)',
                       }}
                       onClick={() => setActivePocket(p.id)}
-                      // ── Drop target handlers ─────────────────────────────
-                      onDragOver={handlers.onDragOver}
-                      onDragLeave={handlers.onDragLeave}
-                      onDrop={handlers.onDrop}
                       className={`sidebar-pocket-item${isDropTarget ? ' sidebar-pocket-item--droptarget' : ''}`}
                       style={{
                         display:      'flex',
                         alignItems:   'center',
                         gap:           8,
+                        // 2px left border always reserved so content never shifts.
                         borderLeft:   `2px solid ${isDropTarget || isActive ? 'var(--primary)' : 'transparent'}`,
                         padding:      '6px 10px 6px 8px',
                         borderRadius: '0 var(--r-sm) var(--r-sm) 0',
                         cursor:       'pointer',
                         fontSize:      11,
                         marginBottom:  2,
-                        color:         isDropTarget ? 'var(--primary)' : isActive ? 'var(--primary)' : 'var(--muted)',
+                        color:         isDropTarget || isActive ? 'var(--primary)' : 'var(--muted)',
                         background:    isDropTarget ? 'var(--primary-s)' : isActive ? 'var(--primary-g)' : 'transparent',
                         fontWeight:    isActive ? 600 : 400,
                         position:     'relative',
@@ -306,11 +278,13 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
                         transition:   'background 0.12s, color 0.12s, border-color 0.12s',
                       }}
                     >
-                      {/* Colour dot — pulses gently when the pocket is a live drop target */}
+                      {/* Colour dot — pulses when this pocket is the live drop target */}
                       <motion.div
                         animate={isDropTarget
-                          ? { scale: [1, 1.55, 1], transition: { repeat: Infinity, duration: 0.85, ease: 'easeInOut' } }
-                          : { scale: 1, transition: { type: 'spring', stiffness: 400, damping: 20 } }
+                          ? { scale: [1, 1.55, 1],
+                              transition: { repeat: Infinity, duration: 0.85, ease: 'easeInOut' } }
+                          : { scale: 1,
+                              transition: { type: 'spring', stiffness: 400, damping: 20 } }
                         }
                         style={{
                           width:        7,
@@ -418,11 +392,11 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
         {/* ── Zone 3: Vault info + dark-mode toggle (fixed bottom) ─────── */}
         <div
           style={{
-            flexShrink:  0,
-            padding:     '8px 10px',
-            borderTop:   '0.5px solid var(--divider)',
-            fontSize:    9,
-            color:       'var(--muted)',
+            flexShrink: 0,
+            padding:    '8px 10px',
+            borderTop:  '0.5px solid var(--divider)',
+            fontSize:   9,
+            color:      'var(--muted)',
           }}
         >
           <motion.button
@@ -507,15 +481,15 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
                 animate={{ x: isDark ? 15 : 0 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 style={{
-                  width:           13,
-                  height:          13,
-                  background:      'var(--primary)',
-                  borderRadius:    '50%',
-                  display:         'flex',
-                  alignItems:      'center',
-                  justifyContent:  'center',
-                  fontSize:        7,
-                  color:           'white',
+                  width:          13,
+                  height:         13,
+                  background:     'var(--primary)',
+                  borderRadius:   '50%',
+                  display:        'flex',
+                  alignItems:     'center',
+                  justifyContent: 'center',
+                  fontSize:       7,
+                  color:          'white',
                 }}
               >
                 ✦
@@ -547,26 +521,22 @@ const SectionLabel = ({ label }: { label: string }) => (
 );
 
 const NavItem = ({
-  label, icon, active, onClick, isDropTarget = false, dragHandlers,
+  label, icon, active, onClick, isDropTarget = false, pocketId,
 }: {
   label:         string;
   icon:          string;
   active:        boolean;
   onClick:       () => void;
   isDropTarget?: boolean;
-  dragHandlers?: {
-    onDragOver:  (e: React.DragEvent<HTMLDivElement>) => void;
-    onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
-    onDrop:      (e: React.DragEvent<HTMLDivElement>) => void;
-  };
+  /** When set, the element carries data-pocket-id for drag detection. */
+  pocketId?:     string;
 }) => (
   <motion.div
     whileHover={{ background: 'var(--primary-s)', color: 'var(--primary)' }}
     transition={springHover}
     onClick={onClick}
-    onDragOver={dragHandlers?.onDragOver}
-    onDragLeave={dragHandlers?.onDragLeave}
-    onDrop={dragHandlers?.onDrop}
+    // data-pocket-id is the hook for NoteCard's elementsFromPoint detection.
+    {...(pocketId !== undefined ? { 'data-pocket-id': pocketId } : {})}
     className={isDropTarget ? 'sidebar-pocket-item--droptarget' : undefined}
     style={{
       display:      'flex',

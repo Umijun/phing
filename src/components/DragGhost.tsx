@@ -26,16 +26,17 @@ const DragGhost = () => {
       {dragging && (
         <motion.div
           // Position follows the cursor via MotionValues — no React re-render.
+          // translateX/Y are intentionally NOT set here; they would collide with
+          // the x/y MotionValue slots and produce incorrect positioning.  The
+          // centring offset is applied on the inner wrapper div instead.
           style={{
-            position:    'fixed',
-            left:        0,
-            top:         0,
-            x:           ghostX,
-            y:           ghostY,
-            translateX:  '-50%',
-            translateY:  '-60%',    // slightly above the finger / cursor tip
+            position:      'fixed',
+            left:          0,
+            top:           0,
+            x:             ghostX,
+            y:             ghostY,
             pointerEvents: 'none',  // must not intercept pointer events
-            zIndex:      9999,
+            zIndex:        9999,
           }}
           // ── Enter spring ──────────────────────────────────────────────────
           initial={{ scale: 0, opacity: 0, rotate: -6 }}
@@ -49,6 +50,9 @@ const DragGhost = () => {
                   transition: { type: 'spring', stiffness: 600, damping: 28 } }}
           transition={{ type: 'spring', stiffness: 520, damping: 30 }}
         >
+          {/* Offset wrapper: shifts the paper slightly above and centred on the
+              cursor tip without touching the MotionValue transform slots. */}
+          <div style={{ transform: 'translate(-50%, -60%)' }}>
           <div className="drag-ghost__paper">
             {/* Paper fold corner */}
             <div className="drag-ghost__fold" />
@@ -78,6 +82,7 @@ const DragGhost = () => {
               )}
             </AnimatePresence>
           </div>
+          </div>{/* /offset wrapper */}
         </motion.div>
       )}
     </AnimatePresence>,

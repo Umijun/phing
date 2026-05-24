@@ -1,8 +1,9 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNoteStore, Note, Pocket } from '../store/noteStore';
 import { stripMarkdown } from '../lib/stripMarkdown';
 import { formatNoteDate } from '../lib/formatTime';
+import { ghostX, ghostY, useNoteDrag } from '../lib/noteDrag';
 
 const TAG_PALETTE = [
   { bg: '#F6E3CB', fg: '#9A6B3A' },
@@ -14,12 +15,12 @@ const TAG_PALETTE = [
 ];
 
 const NoteList = () => {
-  const notes        = useNoteStore((s) => s.notes);
-  const pockets      = useNoteStore((s) => s.pockets);
-  const activePocket = useNoteStore((s) => s.activePocket);
+  const notes          = useNoteStore((s) => s.notes);
+  const pockets        = useNoteStore((s) => s.pockets);
+  const activePocket   = useNoteStore((s) => s.activePocket);
   const selectedNoteId = useNoteStore((s) => s.selectedNoteId);
-  const isDark       = useNoteStore((s) => s.isDark);
-  const createNote   = useNoteStore((s) => s.createNote);
+  const isDark         = useNoteStore((s) => s.isDark);
+  const createNote     = useNoteStore((s) => s.createNote);
 
   const filtered = useMemo(
     () => notes.filter((n: Note) => activePocket === '' || n.folder === activePocket),
@@ -96,53 +97,150 @@ const NoteList = () => {
   );
 };
 
-/** Memoised — only re-renders when note data, active state, or dark mode changes */
+// ── NoteCard ───────────────────────────────────────────────────────────────────
+
+// Defined at module scope so the object reference is stable across renders.
+// Inline variant objects would be recreated every render and cause framer-motion
+// to re-evaluate transitions unnecessarily.
+const NOTE_CARD_VARIANTS = {
+  idle:     { scale: 1,    opacity: 1,    transition: { type: 'spring' as const, stiffness: 500, damping: 32 } },
+  dragging: { scale: 0.96, opacity: 0.45, transition: { type: 'spring' as const, stiffness: 500, damping: 32 } },
+};
+
+/** Memoised — only re-renders when note data, active state, or dark mode changes. */
 const NoteCard = memo(({
   note,
   active,
   isDark,
 }: {
-  note: Note;
+  note:   Note;
   active: boolean;
   isDark: boolean;
 }) => {
-  // Stable store action refs (Zustand actions never change identity)
-  const selectNote = useNoteStore((s) => s.selectNote);
-  const deleteNote = useNoteStore((s) => s.deleteNote);
+  const selectNote    = useNoteStore((s) => s.selectNote);
+  const deleteNote    = useNoteStore((s) => s.deleteNote);
+  const moveNote      = useNoteStore((s) => s.moveNote);
+  const setActivePocket = useNoteStore((s) => s.setActivePocket);
+
+  const { setDragging, setHoveredPocket } = useNoteDrag.getState();
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDragging,    setIsDragging]    = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
 
-  // Expensive computations are memoised per-card
+  // Guard against rapid successive pointerdowns registering duplicate window
+  // listeners.  Cleared in the pointerup / pointercancel cleanup path.
+  const isListeningRef = useRef(false);
+
   const snip = useMemo(() => stripMarkdown(note.content), [note.content]);
-  const ago  = useMemo(() => formatNoteDate(note.updatedAt), [note.updatedAt]);
+  const ago  = useMemo(() => formatNoteDate(note.updatedAt),  [note.updatedAt]);
 
-  // Attach HTML5 drag events imperatively — framer-motion overrides the
-  // React onDragStart type for its own pointer-based drag API, so we bypass
-  // the type conflict by using native DOM listeners on the element ref.
-  useEffect(() => {
-    const el = cardRef.current;
-    if (!el) return;
-    el.draggable = true;
+  // ── Pointer-based drag ─────────────────────────────────────────────────────
+  //
+  // We use pointer events rather than HTML5 drag-and-drop because:
+  //   1. HTML5 drag + framer-motion have a React type conflict on onDragStart.
+  //   2. Pointer events work reliably across Tauri WebView / WebKit.
+  //   3. We want full control over the custom ghost appearance.
+  //
+  // Strategy:
+  //   • onPointerDown  — start listening; initialise ghost position.
+  //   • pointermove    — once the threshold is crossed, activate the drag:
+  //                      update ghost position and check which pocket element
+  //                      (identified by data-pocket-id) is under the cursor.
+  //   • pointerup      — commit the move if over a valid target; clean up.
 
-    const onDragStart = (e: DragEvent) => {
-      if (!e.dataTransfer) return;
-      e.dataTransfer.setData('text/plain', note.id);
-      e.dataTransfer.effectAllowed = 'move';
-      // Tiny delay so the browser snapshots the pre-transform card as the
-      // drag ghost image before framer-motion applies the lift variants.
-      requestAnimationFrame(() => setIsDragging(true));
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Ignore clicks on the delete button.
+    if ((e.target as Element).closest('.note-card-delete')) return;
+    // Only primary pointer (left-click / single touch).
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    // Guard: skip if window listeners are already attached (rapid double-tap).
+    if (isListeningRef.current) return;
+
+    // Suppress the browser's default pointerdown behaviour — most importantly
+    // the text-selection machinery that fires before any movement threshold is
+    // crossed.  Without this, holding the mouse down briefly highlights text
+    // even when the user only intends to click or drag the card.
+    e.preventDefault();
+
+    isListeningRef.current = true;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false; // whether the drag threshold has been crossed
+
+    // Seed ghost at pointer position so it appears right under the finger.
+    ghostX.set(startX);
+    ghostY.set(startY);
+
+    const onMove = (ev: PointerEvent) => {
+      ghostX.set(ev.clientX);
+      ghostY.set(ev.clientY);
+
+      if (!dragging) {
+        const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+        if (dist < 8) return; // movement threshold — prevents accidental drags
+        // Threshold crossed — activate drag.
+        dragging = true;
+        setIsDragging(true);
+        setDragging({ noteId: note.id, title: note.title, emoji: note.emoji, folder: note.folder });
+      }
+
+      // Identify the pocket element under the cursor.
+      // The ghost has pointer-events: none so it is invisible to elementsFromPoint.
+      const elements = document.elementsFromPoint(ev.clientX, ev.clientY);
+      const pocketEl = elements.find((el) => el.hasAttribute('data-pocket-id'));
+      const pocketId = pocketEl ? pocketEl.getAttribute('data-pocket-id') : null;
+      setHoveredPocket(pocketId);
     };
-    const onDragEnd = () => setIsDragging(false);
 
-    el.addEventListener('dragstart', onDragStart);
-    el.addEventListener('dragend',   onDragEnd);
-    return () => {
-      el.removeEventListener('dragstart', onDragStart);
-      el.removeEventListener('dragend',   onDragEnd);
+    const cleanup = () => {
+      window.removeEventListener('pointermove',   onMove);
+      window.removeEventListener('pointerup',     onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      isListeningRef.current = false;
     };
-  }, [note.id]); // note.id is stable per mounted NoteCard
+
+    const onUp = () => {
+      cleanup();
+
+      if (dragging) {
+        setIsDragging(false);
+
+        // Read live state to avoid stale closures.
+        const { hoveredPocketId } = useNoteDrag.getState();
+
+        if (hoveredPocketId !== null && note.folder !== hoveredPocketId) {
+          // Drop on a valid target — move the note and navigate there.
+          void moveNote(note.id, hoveredPocketId);
+          setActivePocket(hoveredPocketId);
+        }
+
+        // Always reset drag state after release.
+        setDragging(null);
+        setHoveredPocket(null);
+      } else {
+        // Threshold never crossed → treat as a tap / click.
+        void selectNote(note.id);
+      }
+    };
+
+    // pointercancel fires when the browser takes over (e.g. scroll gesture).
+    // It must clean up drag state but MUST NOT trigger note selection.
+    const onCancel = () => {
+      cleanup();
+
+      if (dragging) {
+        setIsDragging(false);
+        setDragging(null);
+        setHoveredPocket(null);
+      }
+      // No selectNote call — the interaction was cancelled, not completed.
+    };
+
+    window.addEventListener('pointermove',   onMove);
+    window.addEventListener('pointerup',     onUp);
+    window.addEventListener('pointercancel', onCancel);
+  };
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -157,26 +255,18 @@ const NoteCard = memo(({
 
   return (
     <motion.div
-      // ── Exit: slide-shrink out of the list ──────────────────────────────
+      // ── Exit: shrink the card out of the list on move / delete ────────────
       exit={{
         opacity: 0, scale: 0.94, height: 0,
         marginBottom: 0, paddingTop: 0, paddingBottom: 0,
         transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] },
       }}
-      // ── Drag-lift: lifted card floats above the list ─────────────────────
-      variants={{
-        idle:     { scale: 1, rotate: 0, opacity: 1,
-                    transition: { type: 'spring', stiffness: 500, damping: 32 } },
-        dragging: { scale: 1.05, rotate: 1.6, opacity: 0.72,
-                    transition: { type: 'spring', stiffness: 500, damping: 32 } },
-      }}
+      // ── Drag-ghost source: card fades + shrinks so the ghost feels "lifted" ─
+      variants={NOTE_CARD_VARIANTS}
       animate={isDragging ? 'dragging' : 'idle'}
-      // Disable hover/tap feedback while dragging so they don't fight the lift
       whileHover={isDragging ? undefined : { scale: 1.012, boxShadow: '0 6px 22px var(--primary-g)' }}
       whileTap={isDragging   ? undefined : { scale: 0.99 }}
-      // ref wires up HTML5 drag events (see useEffect above)
-      ref={cardRef}
-      onClick={() => { if (!isDragging) void selectNote(note.id); }}
+      onPointerDown={handlePointerDown}
       className={active ? 'note-card note-card--active' : 'note-card'}
       style={{
         background:   'var(--card)',
@@ -184,13 +274,12 @@ const NoteCard = memo(({
         padding:      '14px 16px 12px',
         cursor:       isDragging ? 'grabbing' : 'grab',
         border:       active ? '0.5px solid var(--primary)' : '0.5px solid var(--border)',
-        boxShadow:    isDragging
-          ? '0 20px 50px rgba(0,0,0,0.16), 0 4px 18px var(--primary-g)'
-          : active ? undefined : '0 1px 4px rgba(0,0,0,0.04)',
+        boxShadow:    active ? undefined : '0 1px 4px rgba(0,0,0,0.04)',
         position:     'relative',
         overflow:     'hidden',
         willChange:   'transform',
-        userSelect:   'none',
+        userSelect:   isDragging ? 'none' : undefined,
+        touchAction:  'none', // prevent browser scroll-on-drag on mobile
       }}
     >
       {/* Title row */}
@@ -198,13 +287,13 @@ const NoteCard = memo(({
         {note.emoji && <span style={{ fontSize: 13, flexShrink: 0 }}>{note.emoji}</span>}
         <div
           style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--strong)',
-            overflow: 'hidden',
+            fontSize:     13,
+            fontWeight:   600,
+            color:        'var(--strong)',
+            overflow:     'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            flex: 1,
+            whiteSpace:   'nowrap',
+            flex:         1,
           }}
         >
           {note.title}
@@ -215,14 +304,14 @@ const NoteCard = memo(({
       {snip && (
         <div
           style={{
-            fontSize: 11,
-            color: 'var(--soft)',
-            lineHeight: 1.5,
-            marginBottom: 8,
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
+            fontSize:         11,
+            color:            'var(--soft)',
+            lineHeight:       1.5,
+            marginBottom:     8,
+            display:          '-webkit-box',
+            WebkitLineClamp:  2,
+            WebkitBoxOrient:  'vertical',
+            overflow:         'hidden',
           }}
         >
           {snip}
@@ -238,12 +327,12 @@ const NoteCard = memo(({
               <span
                 key={tag}
                 style={{
-                  fontSize: 9,
-                  fontWeight: isDark ? 600 : 500,
-                  padding: '2px 7px',
+                  fontSize:     9,
+                  fontWeight:   isDark ? 600 : 500,
+                  padding:      '2px 7px',
                   borderRadius: 100,
-                  background: isDark ? 'var(--primary-s)' : palette.bg,
-                  color: isDark ? 'var(--primary)' : palette.fg,
+                  background:   isDark ? 'var(--primary-s)' : palette.bg,
+                  color:        isDark ? 'var(--primary)'   : palette.fg,
                 }}
               >
                 #{tag}
@@ -261,21 +350,21 @@ const NoteCard = memo(({
         onClick={handleDelete}
         title={confirmDelete ? 'Click again to confirm' : 'Delete note'}
         style={{
-          position: 'absolute',
-          right: 8,
-          bottom: 9,
-          border: 'none',
+          position:     'absolute',
+          right:        8,
+          bottom:       9,
+          border:       'none',
           borderRadius: 6,
-          padding: '2px 7px',
-          fontSize: 10,
-          fontWeight: 700,
-          fontFamily: 'var(--font-ui)',
-          cursor: 'pointer',
+          padding:      '2px 7px',
+          fontSize:     10,
+          fontWeight:   700,
+          fontFamily:   'var(--font-ui)',
+          cursor:       'pointer',
           letterSpacing: '0.2px',
-          background: confirmDelete ? 'rgba(255,82,82,0.1)' : 'transparent',
-          color: confirmDelete ? '#FF5252' : 'var(--soft)',
-          opacity: confirmDelete ? 1 : undefined,
-          transition: 'background 0.15s, color 0.15s',
+          background:   confirmDelete ? 'rgba(255,82,82,0.1)' : 'transparent',
+          color:        confirmDelete ? '#FF5252' : 'var(--soft)',
+          opacity:      confirmDelete ? 1 : undefined,
+          transition:   'background 0.15s, color 0.15s',
         }}
       >
         {confirmDelete ? 'delete?' : '✕'}

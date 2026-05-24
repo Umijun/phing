@@ -14,6 +14,7 @@ import CommandPalette from './components/CommandPalette';
 import MindMapBoard from './components/MindMapBoard';
 import Onboarding from './components/Onboarding';
 import ConflictDialogue, { type ConflictInfo } from './components/ConflictDialogue';
+import DragGhost from './components/DragGhost';
 
 // ── Onboarding guard ───────────────────────────────────────────────────────────
 // Show onboarding if no vault has been configured AND the profile still uses the
@@ -307,6 +308,9 @@ const App = () => {
         onKeepLocal={handleConflictKeepLocal}
         onDismiss={handleConflictDismiss}
       />
+
+      {/* Drag ghost — portal-rendered above all panels, pointer-events: none */}
+      <DragGhost />
     </div>
   );
 };

@@ -801,10 +801,68 @@ textarea,
   box-shadow: 0 0 0 2px var(--primary-g), 0 6px 24px var(--primary-g) !important;
 }
 
-/* ── Pocket drop target glow ──────────────────────────────────────────────── */
+/* ── Pocket drop-target glow ring ─────────────────────────────────────────── */
 .sidebar-pocket-item--droptarget {
-  box-shadow: inset 0 0 0 1px var(--primary), 0 0 14px var(--primary-g) !important;
+  box-shadow:   inset 0 0 0 1px var(--primary), 0 0 14px var(--primary-g) !important;
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+
+/* ── Drag ghost paper ─────────────────────────────────────────────────────── */
+.drag-ghost__paper {
+  position:       relative;
+  display:        flex;
+  flex-direction: column;
+  gap:            4px;
+  padding:        10px 14px 9px;
+  background:     var(--card);
+  border:         0.5px solid var(--primary);
+  border-radius:  12px;
+  box-shadow:     0 14px 36px rgba(0, 0, 0, 0.14), 0 2px 8px var(--primary-g);
+  max-width:      190px;
+  min-width:      120px;
+}
+
+/* Folded paper corner — purely decorative */
+.drag-ghost__fold {
+  position:      absolute;
+  top:           0;
+  right:         0;
+  width:         14px;
+  height:        14px;
+  background:    linear-gradient(225deg, var(--primary-s) 50%, transparent 50%);
+  border-radius: 0 12px 0 0;
+}
+
+.drag-ghost__body {
+  display:     flex;
+  align-items: center;
+  gap:         7px;
+}
+
+.drag-ghost__icon {
+  font-size:   15px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.drag-ghost__title {
+  font-family:   var(--font-ui);
+  font-size:     12px;
+  font-weight:   600;
+  color:         var(--strong);
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+
+.drag-ghost__hint {
+  font-family:   var(--font-ui);
+  font-size:     9px;
+  font-weight:   600;
+  color:         var(--primary);
+  letter-spacing: 0.4px;
+  text-align:    center;
+  margin-top:    2px;
 }
 
 .note-card .note-card-delete {
