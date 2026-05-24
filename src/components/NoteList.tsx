@@ -318,9 +318,10 @@ const NoteCard = memo(({
         </div>
       )}
 
-      {/* Tags + timestamp */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: 1 }}>
+      {/* Tags + timestamp + delete — all in one flex row so nothing overlaps */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 0 }}>
+        {/* Tags */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           {note.tags.slice(0, 3).map((tag: string, ti: number) => {
             const palette = TAG_PALETTE[ti % TAG_PALETTE.length];
             return (
@@ -340,35 +341,35 @@ const NoteCard = memo(({
             );
           })}
         </div>
-        <span style={{ fontSize: 9, color: 'var(--muted)', flexShrink: 0, marginRight: 24 }}>{ago}</span>
-      </div>
 
-      {/* Delete button */}
-      <button
-        type="button"
-        className="note-card-delete"
-        onClick={handleDelete}
-        title={confirmDelete ? 'Click again to confirm' : 'Delete note'}
-        style={{
-          position:     'absolute',
-          right:        8,
-          bottom:       9,
-          border:       'none',
-          borderRadius: 6,
-          padding:      '2px 7px',
-          fontSize:     10,
-          fontWeight:   700,
-          fontFamily:   'var(--font-ui)',
-          cursor:       'pointer',
-          letterSpacing: '0.2px',
-          background:   confirmDelete ? 'rgba(255,82,82,0.1)' : 'transparent',
-          color:        confirmDelete ? '#FF5252' : 'var(--soft)',
-          opacity:      confirmDelete ? 1 : undefined,
-          transition:   'background 0.15s, color 0.15s',
-        }}
-      >
-        {confirmDelete ? 'delete?' : '✕'}
-      </button>
+        {/* Timestamp */}
+        <span style={{ fontSize: 9, color: 'var(--muted)', flexShrink: 0 }}>{ago}</span>
+
+        {/* Delete button — inline, never overlaps timestamp */}
+        <button
+          type="button"
+          className="note-card-delete"
+          onClick={handleDelete}
+          title={confirmDelete ? 'Click again to confirm' : 'Delete note'}
+          style={{
+            flexShrink:    0,
+            border:        'none',
+            borderRadius:  6,
+            padding:       '2px 6px',
+            fontSize:      10,
+            fontWeight:    700,
+            fontFamily:    'var(--font-ui)',
+            cursor:        'pointer',
+            letterSpacing: '0.2px',
+            lineHeight:    1,
+            background:    confirmDelete ? 'rgba(255,82,82,0.1)' : 'transparent',
+            color:         confirmDelete ? '#FF5252' : 'var(--soft)',
+            transition:    'background 0.15s, color 0.15s',
+          }}
+        >
+          {confirmDelete ? 'delete?' : '✕'}
+        </button>
+      </div>
     </motion.div>
   );
 });

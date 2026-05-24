@@ -69,6 +69,24 @@ export class WriteQueue {
     }
   }
 
+  /**
+   * Drop any pending (not yet inflight) write for `id`.
+   *
+   * Called by `deleteNote` so a queued save cannot resurrect a file that was
+   * just removed from disk.  Inflight writes cannot be interrupted, but the
+   * window is sub-millisecond on a local FS and the note is removed from
+   * in-memory state before this returns, so the watcher will ignore any
+   * subsequent on-disk event.
+   */
+  cancel(id: string): void {
+    const entry = this.pending.get(id);
+    if (!entry) return;
+    // Resolve all waiting promises silently — callers (flushNote) that are
+    // awaiting this write no longer need it to succeed.
+    entry.subs.forEach(({ res }) => res());
+    this.pending.delete(id);
+  }
+
   /** `true` when no writes are pending or inflight. */
   get isIdle(): boolean {
     return this.pending.size === 0 && this.inflight.size === 0;

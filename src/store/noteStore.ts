@@ -432,6 +432,17 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   deleteNote: async (id) => {
     const note = get().notes.find((n) => n.id === id);
+
+    // ── Cancel any pending write before touching the file ────────────────────
+    // Without this, a debounce timer or a queued write fires after the file is
+    // deleted and silently recreates it on disk.
+    const pendingTimer = flushTimers.get(id);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      flushTimers.delete(id);
+    }
+    noteWriteQueue.cancel(id);
+
     const vaultPath = getVaultPath();
     if (vaultPath && note?.filePath && isTauri()) {
       try {
