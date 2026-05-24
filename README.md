@@ -46,3 +46,50 @@ Crafted with obsessive attention to detail using:
 <div align="center">
   <sub>Built with care by a law student trying to survive late-night research.</sub>
 </div>
+
+---
+<details>
+<summary><h2>⌨️ Features & Hotkeys (Click to expand)</h2></summary>
+
+### 🌐 Global
+
+| Hotkey | Action |
+|---|---|
+| `⌘K` | Open Command Palette |
+| `⌘⇧M` | Toggle between Notes view ↔ Mind Map Board |
+| `⌘N` | New note |
+| `⌘⇧Z` | Toggle Zen mode |
+| `⌘⇧A` | Toggle Academic mode (A4 paper layout) |
+| `⌘⇧S` | Collapse / expand sidebar + note list panels |
+| `⌘⇧B` | Toggle Backlinks panel |
+| `⌘⌫` | Delete selected note (press twice within 3 seconds to confirm) |
+
+### 📝 Notes & Editor
+
+| Hotkey | Action |
+|---|---|
+| `⌘F` | Find in note |
+| `Esc` | Close find bar |
+| `⌘1` - `⌘5` | Toggle Heading 1 to 5 |
+| `⌘-` | Insert horizontal rule |
+| `[[` | Open wiki link suggestions |
+
+*The floating formatting toolbar is draggable via the `⠿` handle (double-click to reset position).*
+
+### 🧠 Mind Map Board (`⌘⇧M`)
+
+| Hotkey | Action |
+|---|---|
+| `Tab` | Add child node |
+| `↵ Enter` | Add sibling node |
+| `Space` | Edit selected node's label |
+| `↑ ↓ ← →` | Navigate between nodes |
+| `Del` / `⌫` | Delete selected node |
+| `⌘⇧N` | Open/close attached note pane |
+
+### 🛡️ Data & Reliability (Under the hood)
+* **Atomic writes:** Writes to `.md.tmp` first, preventing partial files on crash.
+* **Recovery journal:** Snapshots previous disk content to `.phing/snapshots/` (max 10 versions).
+* **File watcher:** Detects external changes and prompts a Conflict Dialogue (Reload / Keep local).
+
+</details>
