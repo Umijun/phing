@@ -40,7 +40,7 @@ Crafted with obsessive attention to detail using:
 
 ## 🚀 Current State (v0.1.0-alpha)
 * **Phase 1 (Reliability & Trust Layer): 🟢 Completed.** The core data architecture is rock-solid.
-* **Phase 2 (Performance & Invisible Speed): 🟡 In Progress.** Currently optimising large mind map virtualisation and heavy UI dynamic disciplines.
+* **Phase 2 (Performance & Invisible Speed): 🟡 In Progress.** Currently optimising large mind map virtualisation and heavy UI dynamic disciplines aaaaaaand!! tag system (still placeholder ._.).
 
 ---
 <div align="center">
