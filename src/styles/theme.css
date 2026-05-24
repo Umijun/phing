@@ -1,0 +1,1925 @@
+/* ── Phing Design System ─────────────────────────────── */
+
+@font-face {
+  font-family: 'Lora';
+  src: url('/fonts/Lora-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url('/fonts/Lora-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url('/fonts/Lora-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url('/fonts/Lora-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url('/fonts/Lora-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url('/fonts/Lora-BoldItalic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ── LINESeedSans — Latin (A) variant ──────────────────────
+   Served from /public/fonts/ so Tauri / Vite both resolve it
+   via the same root-relative path as Lora above.
+   unicode-range restricts each face to its glyph coverage so
+   the browser only downloads what the text actually needs.    */
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSans_A_Th.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSans_A_Rg.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSans_A_Bd.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSans_A_XBd.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSans_A_He.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── LINESeedSans — Thai (TH) variant ──────────────────────
+   Covers the Thai Unicode block U+0E00-0E7F.
+   The browser merges both variants under one family name and
+   picks the right file per character automatically.          */
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSansTH_Th.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0E00-0E7F;
+}
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSansTH_Rg.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0E00-0E7F;
+}
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSansTH_Bd.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0E00-0E7F;
+}
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSansTH_XBd.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0E00-0E7F;
+}
+
+@font-face {
+  font-family: 'LINESeedSans';
+  src: url('/fonts/LINESeedSansTH_He.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0E00-0E7F;
+}
+
+:root {
+  --bg:         #F9F6FA;
+  --card:       #FFFFFF;
+  --sidebar-bg: rgba(249,246,250,0.88);
+  --primary:    #CBAACB;
+  --primary-s:  rgba(203,170,203,0.13);
+  --primary-g:  rgba(203,170,203,0.28);
+  --text:       #6B5B6B;
+  --strong:     #4A3E4A;
+  --muted:      #9C8F9C;
+  --soft:       #C0B0C0;
+  --border:     rgba(203,170,203,0.22);
+  --divider:    rgba(155,140,155,0.12);
+  --h1:         #4A3E4A;
+  --h2:         #6B5B6B;
+  --h3:         #9575CD;
+  --h4:         #FF5252;
+  --h5:         #CBAACB;
+  --r:          20px;
+  --r-sm:       12px;
+  --r-xs:       8px;
+  --font-ui:    'LINESeedSans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
+  --spring:     0.38s cubic-bezier(0.34,1.56,0.64,1);
+  --smooth:     0.28s cubic-bezier(0.4,0,0.2,1);
+}
+
+.dark {
+  --bg:         #1C1A27;
+  --card:       #2A2638;
+  --sidebar-bg: rgba(28,26,39,0.92);
+  --primary:    #AEC6CF;
+  --primary-s:  rgba(174,198,207,0.12);
+  --primary-g:  rgba(174,198,207,0.25);
+  --text:       #E2DFE6;
+  --strong:     #FFFFFF;
+  --muted:      #8F8B9C;
+  --soft:       #605E76;
+  --border:     rgba(174,198,207,0.16);
+  --divider:    rgba(174,198,207,0.08);
+  --h1:         #FFFFFF;
+  --h2:         #E2DFE6;
+  --h3:         #B39DDB;
+  --h4:         #FF8A8A;
+  --h5:         #AEC6CF;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  transition: background var(--smooth), color var(--smooth);
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* ── Thai text rendering ─────────────────────────────────────
+   Thai combining vowels / tone marks are zero-width glyphs
+   that sit above or below the base character. Any non-zero
+   letter-spacing pushes them off their base → broken render.
+   We reset it on every element that can hold user-typed Thai.
+   ─────────────────────────────────────────────────────────── */
+:lang(th),
+[lang='th'],
+.editor-title,
+.editor-desc,
+.editor-title *,
+.editor-desc *,
+.phing-editor .ProseMirror,
+.phing-editor .ProseMirror *,
+.sidebar-profile__name,
+.sidebar-profile__subtitle,
+input,
+textarea,
+[contenteditable] {
+  /* Safe for both scripts: Latin looks fine at 0, Thai requires it */
+  letter-spacing: 0;
+  /* Ensure Thai line breaks correctly at word boundaries */
+  word-break: normal;
+  overflow-wrap: break-word;
+  /* Smooth subpixel rendering for LINESeedSans */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Keep ALL-CAPS UI labels (e.g. meta, section headers) at their
+   tracked spacing — they're always Latin and never user-typed  */
+.editor-meta,
+.mm-toolbar__title,
+.mm-hints,
+.editor-footnotes__label,
+.editor-toc-panel [style*='letter-spacing'] {
+  letter-spacing: inherit;
+}
+
+/* ── Editor surface (Lora everywhere in the writing pane) ── */
+.editor-surface {
+  font-family: var(--font-serif);
+  color: var(--text);
+}
+
+.editor-meta {
+  font-family: var(--font-serif);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.editor-title {
+  font-family: var(--font-serif);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--h1);
+  letter-spacing: -0.6px;
+  line-height: 1.2;
+  outline: none;
+  margin-bottom: 10px;
+  cursor: text;
+  min-height: 1.2em;
+}
+
+.editor-title:empty::before {
+  content: attr(data-placeholder);
+  color: var(--soft);
+  font-style: italic;
+  pointer-events: none;
+}
+
+.editor-desc {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-style: italic;
+  color: var(--muted);
+  line-height: 1.6;
+  outline: none;
+  margin-bottom: 20px;
+  cursor: text;
+  min-height: 1.4em;
+}
+
+.editor-desc:empty::before {
+  content: attr(data-placeholder);
+  color: var(--soft);
+  pointer-events: none;
+}
+
+.editor-tags {
+  font-family: var(--font-serif);
+}
+
+.editor-tag {
+  font-family: var(--font-serif);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ── TipTap / ProseMirror ─────────────────────────────────── */
+.phing-editor {
+  outline: none;
+  min-height: 400px;
+}
+
+.phing-editor,
+.phing-editor .ProseMirror {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--text);
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.phing-editor .ProseMirror-focused {
+  caret-color: var(--primary);
+}
+
+.phing-editor ::selection {
+  background: var(--primary-g);
+}
+
+/* Spacing — single source of truth */
+.phing-editor .ProseMirror h1,
+.phing-editor .heading-block--h1 {
+  margin: 0 0 0.5rem;
+}
+
+.phing-editor .ProseMirror h2,
+.phing-editor .heading-block--h2 {
+  margin: 2.5rem 0 0.75rem;
+}
+
+.phing-editor .ProseMirror h3,
+.phing-editor .heading-block--h3 {
+  margin: 2rem 0 0.6rem;
+}
+
+.phing-editor .ProseMirror h4,
+.phing-editor .heading-block--h4 {
+  margin: 1.75rem 0 0.5rem;
+}
+
+.phing-editor .ProseMirror h5,
+.phing-editor .heading-block--h5 {
+  margin: 1.5rem 0 0.5rem;
+}
+
+.phing-editor .ProseMirror p {
+  margin: 0 0 1.1rem;
+}
+
+.phing-editor .ProseMirror h1:first-child,
+.phing-editor .heading-block--h1:first-child {
+  margin-top: 0;
+}
+
+/* Heading visuals */
+.phing-editor .ProseMirror h1,
+.phing-editor .heading-block--h1 {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--h1);
+  letter-spacing: -0.5px;
+  line-height: 1.25;
+}
+
+.phing-editor .ProseMirror h2,
+.phing-editor .heading-block--h2 {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--h2);
+  line-height: 1.3;
+  border-bottom: 2px solid var(--primary);
+  padding-bottom: 0.25rem;
+}
+
+.phing-editor .ProseMirror h3,
+.phing-editor .heading-block--h3 {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--h3);
+  line-height: 1.35;
+}
+
+.phing-editor .ProseMirror h4,
+.phing-editor .heading-block--h4 {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--h4);
+}
+
+.phing-editor .ProseMirror h5,
+.phing-editor .heading-block--h5 {
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--h5);
+  letter-spacing: 0.02em;
+}
+
+/* Markdown # markers (decoration widget) */
+.phing-editor .ProseMirror h1,
+.phing-editor .ProseMirror h2,
+.phing-editor .ProseMirror h3,
+.phing-editor .ProseMirror h4,
+.phing-editor .ProseMirror h5 {
+  pointer-events: auto;
+  user-select: text;
+}
+
+.phing-editor .syntax-marker,
+.phing-editor .heading-marker {
+  display: inline;
+  opacity: 0;
+  font-size: 0;
+  color: var(--primary);
+  font-weight: 400;
+  user-select: none;
+  pointer-events: none;
+  transition: opacity 0.15s ease, font-size 0.15s ease;
+  margin-right: 0.1em;
+}
+
+.phing-editor.syntax-visible .heading-marker.is-active {
+  opacity: 0.6;
+  font-size: inherit;
+}
+
+.phing-editor.syntax-visible .syntax-marker.is-active {
+  opacity: 0.4;
+  font-size: inherit;
+}
+
+/* ── Zen Focus Blur ─────────────────────────────────────────
+   Smooth fade on entry / exit (triggered by class toggle).
+   The active block is crystal-clear; everything else sinks
+   into a soft, milky-glass blur.
+   A fixed gradient overlay dims the document edges so the
+   cursor always feels centred in a lit window.               */
+
+.editor-scroll {
+  position: relative; /* anchor for the zen gradient overlay */
+}
+
+.editor-scroll.zen-mode::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 5;
+  /* The gradient is attached to the scroll viewport via sticky
+     so it always obscures the top + bottom edges regardless of
+     scroll position.  We paint it as a box-shadow instead so we
+     don't consume any layout space.                             */
+}
+
+/* Top + bottom fade veil — GPU composited via opacity+transform */
+.editor-scroll.zen-mode .editor-surface::before,
+.editor-scroll.zen-mode .editor-surface::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 30vh;
+  pointer-events: none;
+  z-index: 4;
+  transition: opacity 0.32s ease;
+}
+
+.editor-scroll.zen-mode .editor-surface::before {
+  top: 0;
+  background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
+}
+
+.editor-scroll.zen-mode .editor-surface::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+}
+
+/* Defocused blocks: milky-glass blur that fades in smoothly */
+.phing-editor .ProseMirror .zen-defocus {
+  opacity: 0.28;
+  filter: blur(2px) saturate(0.6);
+  transition: opacity 0.32s ease, filter 0.32s ease;
+  will-change: opacity, filter;
+}
+
+/* Active block: snap to full clarity */
+.phing-editor.zen-active .ProseMirror > *:not(.zen-defocus) {
+  opacity: 1;
+  filter: none;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.phing-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--soft);
+  font-style: italic;
+  font-family: var(--font-serif);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.phing-editor strong { font-weight: 700; color: var(--strong); }
+.phing-editor em { font-style: italic; }
+.phing-editor u { text-decoration: underline; text-decoration-color: var(--primary); }
+.phing-editor s { text-decoration: line-through; color: var(--soft); }
+
+.phing-editor code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.88em;
+  background: var(--primary-s);
+  color: var(--primary);
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+}
+
+.phing-editor pre {
+  font-family: ui-monospace, monospace;
+  background: var(--card);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+
+.phing-editor blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 1rem;
+  margin: 1.25rem 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.phing-editor ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.1rem;
+}
+
+.phing-editor ul > li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55em;
+  margin-bottom: 0.35rem;
+}
+
+.phing-editor ul > li::before {
+  content: '●';
+  color: var(--primary);
+  font-size: 0.45em;
+  flex-shrink: 0;
+  /* nudge up so the tiny dot optically centres on the cap-height */
+  position: relative;
+  top: -0.1em;
+}
+
+.phing-editor .ProseMirror ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+  margin: 0 0 1.1rem;
+}
+
+.phing-editor .ProseMirror ol li {
+  list-style-type: decimal;
+}
+
+.phing-editor .ProseMirror ol li::before {
+  display: none;
+}
+
+.phing-editor li {
+  margin-bottom: 0.35rem;
+}
+
+@keyframes dividerFade {
+  0% { opacity: 0; letter-spacing: 2px; }
+  100% { opacity: 0.6; letter-spacing: 5px; }
+}
+
+@keyframes dividerPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+/* Fluffy divider — no line */
+.phing-editor hr {
+  border: none;
+  height: auto;
+  background: none;
+  text-align: center;
+  margin: 2rem 0;
+  color: var(--primary);
+}
+
+.phing-editor hr::after {
+  content: '✦  ·  ✦  ·  ✦';
+  font-family: var(--font-serif);
+  display: inline-block;
+  opacity: 0.6;
+  animation:
+    dividerFade 0.6s ease forwards,
+    dividerPulse 3s ease-in-out 0.6s infinite;
+}
+
+/* WikiLinks */
+.phing-editor .wiki-link,
+.phing-editor [data-wiki-link] {
+  font-family: var(--font-serif);
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--primary-s);
+  padding: 1px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.phing-editor .wiki-link:hover,
+.phing-editor [data-wiki-link]:hover {
+  background: var(--primary-g);
+}
+
+.wiki-link-suggestion {
+  background: var(--card);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px var(--primary-g);
+  padding: 6px;
+  min-width: 200px;
+  max-width: 320px;
+  max-height: 240px;
+  overflow-y: auto;
+  font-family: var(--font-ui);
+}
+
+.wiki-link-suggestion__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.wiki-link-suggestion__item.is-selected,
+.wiki-link-suggestion__item:hover {
+  background: var(--primary-s);
+  color: var(--primary);
+}
+
+.wiki-link-suggestion__empty {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Sidebar profile */
+.sidebar-profile__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 2px 12px var(--primary-g);
+  border: none;
+  padding: 0;
+  background: linear-gradient(135deg, #F4CB9B, var(--primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+}
+
+.sidebar-profile__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sidebar-profile__name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--strong);
+  line-height: 1.2;
+  outline: none;
+}
+
+.sidebar-profile__subtitle {
+  font-size: 10px;
+  color: var(--muted);
+  outline: none;
+}
+
+.sidebar-pocket-item .sidebar-pocket-delete {
+  opacity: 0;
+  border: none;
+  background: transparent;
+  font-size: 9px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px 5px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  letter-spacing: 0.2px;
+}
+
+.sidebar-pocket-item:hover .sidebar-pocket-delete,
+.sidebar-pocket-delete:focus {
+  opacity: 0.7;
+}
+
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.command-palette-anchor {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.command-palette-anchor .command-palette-panel {
+  pointer-events: auto;
+}
+
+.command-palette-panel {
+  position: relative;
+  width: 580px;
+  max-height: 72vh;
+  background: var(--card);
+  border-radius: 24px;
+  border: 0.5px solid var(--border);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.12), 0 4px 20px var(--primary-g);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-card--active {
+  box-shadow: 0 0 0 2px var(--primary-g), 0 6px 24px var(--primary-g) !important;
+}
+
+.note-card .note-card-delete {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.note-card:hover .note-card-delete {
+  opacity: 0.65;
+}
+
+.sidebar-vault__path {
+  font-family: ui-monospace, monospace;
+  font-size: 8px;
+  color: var(--muted);
+  word-break: break-all;
+  line-height: 1.35;
+  opacity: 0.9;
+}
+
+.sidebar-vault__btn {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 0.5px solid var(--border);
+  background: var(--primary-s);
+  color: var(--primary);
+  cursor: pointer;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.sidebar-vault__btn:hover {
+  background: var(--primary-g);
+}
+
+.editor-empty-hint {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+}
+
+.editor-chrome-bar,
+.editor-toolbar,
+.editor-status-bar,
+.editor-find-bar {
+  font-family: var(--font-ui);
+}
+
+/* ── Inline footnote references ────────────────────────── */
+.phing-editor .footnote-ref-inline {
+  display: inline-block;
+  font-size: 0.68em;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-s);
+  border-radius: 4px;
+  padding: 0 3px;
+  vertical-align: super;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.phing-editor .footnote-ref-inline:hover {
+  background: var(--primary-g);
+}
+
+/* ── Footnotes section (below editor body) ──────────────── */
+.editor-footnotes {
+  margin-top: 48px;
+  padding-bottom: 48px;
+}
+
+.editor-footnotes__rule {
+  height: 0.5px;
+  background: var(--divider);
+  margin-bottom: 20px;
+}
+
+.editor-footnotes__label {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.editor-footnotes__item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.editor-footnotes__num {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-s);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.editor-footnotes__text {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── Liquid Glass upgrades ──────────────────────────────────
+   Increase backdrop blur to 28px on all frosted surfaces.
+   Borders drop to very low opacity for a cleaner glass feel. */
+.command-palette-backdrop {
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.command-palette-panel {
+  backdrop-filter: blur(32px) saturate(1.6);
+  -webkit-backdrop-filter: blur(32px) saturate(1.6);
+  border-color: rgba(203, 170, 203, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.55) inset,
+    0 32px 80px var(--primary-g),
+    0 4px 20px rgba(0,0,0,0.06);
+  border-radius: 28px;
+}
+
+.dark .command-palette-panel {
+  border-color: rgba(174, 198, 207, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06) inset,
+    0 32px 80px var(--primary-g),
+    0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* ── Academic A4 Writing Mode ───────────────────────────────
+   Toggle class on the scroll container + surface turns the
+   editor into a centred A4 sheet floating on the background. */
+.editor-scroll.academic-mode {
+  background: var(--bg);
+  padding-top: 0;
+}
+
+.editor-scroll.academic-mode .editor-surface {
+  /* A4 proportions at 96 dpi (794 × 1123 px), soft Nubnib feel */
+  width: 794px;
+  min-height: 1123px;
+  max-width: 794px;
+  margin: 48px auto;
+  padding: 96px 88px 120px;
+  background: var(--card);
+  border-radius: 12px;
+  border: 0.5px solid var(--border);
+  box-shadow:
+    0 4px 48px var(--primary-g),
+    0 1px 8px rgba(0,0,0,0.04);
+}
+
+/* ── Onboarding screen ──────────────────────────────────────
+   Full-screen taro-mochi frosted card shown on first launch. */
+.onboarding-root {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  font-family: var(--font-ui);
+  overflow-y: auto;
+}
+
+.onboarding-card {
+  width: 100%;
+  max-width: 480px;
+  margin: 40px 20px;
+  background: rgba(252, 250, 255, 0.82);
+  backdrop-filter: blur(32px) saturate(1.5);
+  -webkit-backdrop-filter: blur(32px) saturate(1.5);
+  border: 0.5px solid rgba(203, 170, 203, 0.18);
+  border-radius: 32px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.6) inset,
+    0 20px 80px rgba(203,170,203,0.38),
+    0 4px 20px rgba(0,0,0,0.04);
+  padding: 48px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.dark .onboarding-card {
+  background: rgba(14, 10, 24, 0.86);
+  border-color: rgba(174, 198, 207, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.05) inset,
+    0 20px 80px rgba(174,198,207,0.22),
+    0 4px 20px rgba(0,0,0,0.35);
+}
+
+.onboarding-logo {
+  font-size: 28px;
+  text-align: center;
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+
+.onboarding-headline {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--strong);
+  text-align: center;
+  letter-spacing: -0.5px;
+  margin-bottom: 6px;
+}
+
+.onboarding-sub {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  font-style: italic;
+  margin-bottom: 36px;
+  font-family: var(--font-serif);
+}
+
+.onboarding-section {
+  margin-bottom: 24px;
+}
+
+.onboarding-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.onboarding-input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 0.5px solid var(--border);
+  background: var(--bg);
+  color: var(--strong);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.onboarding-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-s);
+}
+
+.onboarding-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.onboarding-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #F4CB9B, var(--primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 16px var(--primary-g);
+  overflow: hidden;
+  border: none;
+  padding: 0;
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+
+.onboarding-avatar:hover { transform: scale(1.05); }
+.onboarding-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.onboarding-vault-path {
+  font-family:   ui-monospace, monospace;
+  font-size:     11px;
+  color:         var(--primary);
+  padding:       8px 12px;
+  background:    var(--primary-s);
+  border-radius: 8px;
+  line-height:   1.4;
+  /* Flex child: grow to fill remaining row space, then truncate long paths. */
+  flex:          1;
+  min-width:     0;       /* lets the flex child shrink below its content width */
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+}
+
+.onboarding-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 16px;
+  border: none;
+  background: var(--primary);
+  color: white;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 24px var(--primary-g);
+  transition: opacity 0.18s, transform 0.18s, box-shadow 0.18s;
+  letter-spacing: 0.2px;
+  margin-top: 8px;
+}
+
+.onboarding-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 32px var(--primary-g);
+}
+
+.onboarding-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.onboarding-btn--ghost {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 0;
+  padding: 10px;
+}
+
+.onboarding-btn--ghost:hover:not(:disabled) {
+  color: var(--primary);
+  box-shadow: none;
+  transform: none;
+}
+
+/* ── PDF / Print export ─────────────────────────────────────
+   Applied when window.print() is triggered via the toolbar.
+   Forces A4, Lora body, hides all chrome.                   */
+@media print {
+  body * { visibility: hidden; }
+
+  .phing-print-area,
+  .phing-print-area * {
+    visibility: visible;
+  }
+
+  .phing-print-area {
+    position: fixed;
+    inset: 0;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 24mm 20mm 28mm;
+    font-family: 'Lora', Georgia, serif;
+    font-size: 11pt;
+    line-height: 1.75;
+    color: #1a1a1a;
+    background: white;
+  }
+
+  .phing-print-area h1 { font-size: 22pt; margin-bottom: 4mm; page-break-after: avoid; }
+  .phing-print-area h2 { font-size: 16pt; margin: 8mm 0 3mm; page-break-after: avoid; }
+  .phing-print-area h3 { font-size: 13pt; margin: 6mm 0 2mm; page-break-after: avoid; }
+  .phing-print-area p  { margin-bottom: 4mm; }
+  .phing-print-area blockquote { border-left: 2pt solid #ccc; padding-left: 6mm; color: #555; }
+  .phing-print-area pre { font-family: monospace; font-size: 9pt; border: 0.5pt solid #ccc; padding: 4mm; }
+  .phing-print-area a { color: #333; text-decoration: underline; }
+
+  @page { size: A4; margin: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MIND MAP BOARD
+   ═══════════════════════════════════════════════════════════ */
+
+/* Board container — flex direction is set inline (row for sidebar | canvas) */
+.mm-board {
+  background: var(--bg);
+  display: flex;
+  font-family: var(--font-ui);
+}
+
+/* Override React Flow canvas bg */
+.mm-board .react-flow__renderer {
+  background: var(--bg);
+}
+
+/* ── Toolbar ────────────────────────────────────────────── */
+.mm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+  z-index: 20;
+  position: relative;
+  gap: 12px;
+}
+
+.mm-toolbar__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.mm-toolbar__sep {
+  width: 0.5px;
+  height: 16px;
+  background: var(--border);
+}
+
+.mm-toolbar__btn {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: 0.5px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.mm-toolbar__btn:hover {
+  background: var(--primary-s);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.mm-toolbar__btn--primary {
+  background: var(--primary-s);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.mm-toolbar__btn--primary:hover {
+  background: var(--primary-g);
+}
+
+.mm-toolbar__btn--danger:hover {
+  background: rgba(255, 82, 82, 0.1);
+  color: #FF5252;
+  border-color: rgba(255, 82, 82, 0.3);
+}
+
+/* ── Keyboard hints bar ─────────────────────────────────── */
+.mm-hints {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 5px 24px;
+  font-size: 9px;
+  color: var(--muted);
+  background: var(--bg);
+  border-bottom: 0.5px solid var(--divider);
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+
+.mm-hints span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mm-hints kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--card);
+  border: 0.5px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--strong);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* ── React Flow overrides ───────────────────────────────── */
+
+/* Remove default React Flow styles that clash */
+.mm-board .react-flow__node {
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.mm-board .react-flow__node.selected > * {
+  /* We handle selected state ourselves */
+}
+
+.mm-board .react-flow__handle {
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: none;
+  background: transparent;
+}
+
+.mm-board .react-flow__controls-button {
+  background: var(--card);
+  border-bottom: 0.5px solid var(--border);
+  fill: var(--muted);
+}
+
+.mm-board .react-flow__controls-button:hover {
+  background: var(--primary-s);
+  fill: var(--primary);
+}
+
+/* ── Mind Map Node — "Nubnib" frosted glass pill ─────────── */
+.mm-node {
+  /* React Flow sets style.width/height on the node wrapper from the
+     layout engine.  width:100% makes the pill fill that wrapper exactly
+     so text never spills outside the frosted-glass background.
+     No min-width or max-width here — the layout engine owns sizing.    */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 18px;
+  border-radius: 24px;
+  border: 0.5px solid rgba(203, 170, 203, 0.28);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 2px 12px rgba(203, 170, 203, 0.14),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.15s ease;
+  will-change: transform;
+  user-select: none;
+}
+
+.dark .mm-node {
+  background: rgba(42, 38, 56, 0.65);
+  border-color: rgba(174, 198, 207, 0.18);
+  box-shadow:
+    0 2px 12px rgba(174, 198, 207, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.mm-node:hover {
+  box-shadow:
+    0 4px 20px rgba(203, 170, 203, 0.25),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+  border-color: rgba(203, 170, 203, 0.5);
+}
+
+.dark .mm-node:hover {
+  box-shadow:
+    0 4px 20px rgba(174, 198, 207, 0.18),
+    0 1px 4px rgba(0, 0, 0, 0.3);
+  border-color: rgba(174, 198, 207, 0.4);
+}
+
+/* Root node — larger, bold */
+.mm-node--root {
+  padding: 13px 28px;
+  border-radius: 32px;
+  background: rgba(203, 170, 203, 0.14);
+  border-color: rgba(203, 170, 203, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(203, 170, 203, 0.22),
+    0 6px 28px rgba(203, 170, 203, 0.22),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.dark .mm-node--root {
+  background: rgba(174, 198, 207, 0.1);
+  border-color: rgba(174, 198, 207, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(174, 198, 207, 0.18),
+    0 6px 28px rgba(174, 198, 207, 0.14),
+    0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+/* Level-1 children */
+.mm-node--l1 {
+  background: rgba(249, 246, 250, 0.7);
+}
+
+.dark .mm-node--l1 {
+  background: rgba(36, 33, 50, 0.7);
+}
+
+/* Selected state — glow ring */
+.mm-node--selected {
+  border-color: var(--primary) !important;
+  box-shadow:
+    0 0 0 2px var(--primary-g),
+    0 6px 28px var(--primary-g),
+    0 2px 6px rgba(0, 0, 0, 0.06) !important;
+}
+
+.dark .mm-node--selected {
+  box-shadow:
+    0 0 0 2px var(--primary-g),
+    0 8px 32px var(--primary-g),
+    0 2px 6px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ── Node label text — see override block at end of file ── */
+/* (Width is now computed by estimateNodeWidth; truncation removed.) */
+
+/* ── Node inline input ──────────────────────────────────── */
+.mm-node-input {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--strong);
+  background: transparent;
+  border: none;
+  outline: none;
+  /* Fill the node width so the caret is always visible,
+     regardless of how wide estimateNodeWidth computed the pill. */
+  width: 100%;
+  min-width: 60px;
+  text-align: center;
+  caret-color: var(--primary);
+}
+
+.mm-node--root .mm-node-input {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* ── Pocket tab strip ───────────────────────────────────── */
+.mm-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  z-index: 21;
+  position: relative;
+}
+.mm-tabs::-webkit-scrollbar { display: none; }
+
+.mm-tab {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 0.5px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.mm-tab:hover {
+  color: var(--primary);
+  background: var(--primary-s);
+}
+.mm-tab--active {
+  color: var(--primary);
+  background: var(--primary-s);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
+/* ── Node note indicator — delicate StickyNote icon ────── */
+/* A semi-transparent whisper in the corner, never a badge */
+.mm-node-note-icon {
+  position:         absolute;
+  top:              5px;
+  right:            6px;
+  border:           none;
+  padding:          2px;
+  background:       transparent;
+  color:            var(--primary);
+  opacity:          0.42;
+  cursor:           pointer;
+  border-radius:    4px;
+  display:          flex;
+  align-items:      center;
+  justify-content:  center;
+  z-index:          2;
+  transition:
+    opacity   0.15s ease,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.mm-node-note-icon:hover {
+  opacity:   0.88;
+  transform: scale(1.25);
+}
+
+/* ── Warm Taro Mochi glow for note-bearing nodes ─────────── */
+/* A soft, ambient warmth — not a badge, not a ping */
+.mm-node--has-note {
+  box-shadow:
+    0 0 18px var(--primary-g),
+    0 2px 12px rgba(203, 170, 203, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.dark .mm-node--has-note {
+  box-shadow:
+    0 0 18px var(--primary-g),
+    0 2px 12px rgba(174, 198, 207, 0.14),
+    0 1px 3px rgba(0, 0, 0, 0.25);
+}
+/* Keep the selected glow dominant when both states are active */
+.mm-node--has-note.mm-node--selected {
+  box-shadow:
+    0 0 0 2px var(--primary-g),
+    0 6px 28px var(--primary-g),
+    0 2px 6px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ── Canvas + note-pane flex row ────────────────────────── */
+.mm-canvas-row {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mm-canvas-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative; /* React Flow uses absolute children */
+}
+
+/* ── Note pane (right-hand split view) ──────────────────── */
+.mm-note-pane {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(252, 250, 255, 0.82);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  border-left: 0.5px solid var(--border);
+  overflow: hidden;
+  /* Framer Motion handles the slide animation via transform */
+  will-change: transform;
+}
+.dark .mm-note-pane {
+  background: rgba(14, 10, 24, 0.86);
+}
+
+/* Header */
+.mm-note-pane__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 12px 11px 16px;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+.mm-note-pane__node-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mm-note-pane__label-dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 6px var(--primary);
+  flex-shrink: 0;
+}
+
+.mm-note-pane__label-text {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapse chevron button */
+.mm-note-pane__close {
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0.5px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.14s, colour 0.14s, border-colour 0.14s;
+  padding: 0;
+}
+.mm-note-pane__close:hover {
+  background: var(--primary-s);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* Scrollable editor area */
+.mm-note-pane__editor {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.mm-note-pane__editor::-webkit-scrollbar { width: 4px; }
+.mm-note-pane__editor::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+/* ProseMirror content — Lora serif, Thai-safe */
+.mm-note-pane__editor-content {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.82;
+  color: var(--strong);
+  letter-spacing: 0;                    /* Thai vowel safety */
+  -webkit-font-smoothing: antialiased;  /* Thai vowel safety */
+  outline: none;
+  caret-color: var(--primary);
+  min-height: 120px;
+}
+.mm-note-pane__editor-content p               { margin: 0 0 0.55em; }
+.mm-note-pane__editor-content p:last-child    { margin-bottom: 0; }
+.mm-note-pane__editor-content strong          { font-weight: 700; }
+.mm-note-pane__editor-content em              { font-style: italic; }
+.mm-note-pane__editor-content h1,
+.mm-note-pane__editor-content h2,
+.mm-note-pane__editor-content h3 {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  margin: 0.9em 0 0.35em;
+  color: var(--strong);
+  letter-spacing: 0;
+}
+.mm-note-pane__editor-content h1 { font-size: 1.25em; }
+.mm-note-pane__editor-content h2 { font-size: 1.1em;  }
+.mm-note-pane__editor-content h3 { font-size: 1em;    }
+.mm-note-pane__editor-content ul,
+.mm-note-pane__editor-content ol { padding-left: 1.3em; margin: 0.4em 0; }
+.mm-note-pane__editor-content li { margin-bottom: 0.2em; }
+.mm-note-pane__editor-content code {
+  font-family: var(--font-mono, 'SF Mono', monospace);
+  font-size: 0.84em;
+  background: var(--primary-s);
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: var(--primary);
+  letter-spacing: 0;
+}
+
+/* Placeholder */
+.mm-note-pane__editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  pointer-events: none;
+  float: left;
+  height: 0;
+  font-style: italic;
+  opacity: 0.62;
+}
+
+/* Footer hint strip */
+.mm-note-pane__footer {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--muted);
+  text-align: center;
+  padding: 7px 10px;
+  border-top: 0.5px solid var(--border);
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+.mm-note-pane__footer kbd {
+  font-family: var(--font-ui);
+  font-size: 8px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 0.5px solid var(--border);
+  background: var(--card);
+  color: var(--strong);
+}
+
+/* ── Sidebar "Board" nav item active colour override ────── */
+.mm-board-nav-active {
+  color: var(--primary) !important;
+  background: var(--primary-s) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   FOOTNOTE DEFINITION LINES
+   Paragraphs that begin with [^label]: are footnote
+   definitions.  They stay in the Tiptap document so they
+   are persisted correctly.  Rather than hiding them (which
+   makes them impossible to click into and edit), we render
+   them as a distinct "aside" — visible, clickable, and
+   editable.  When the cursor enters the paragraph the
+   ProseMirror plugin removes the class entirely so the raw
+   text looks clean while you type.  The footer FOOTNOTES
+   section below the editor gives a nicely formatted view.
+   ═══════════════════════════════════════════════════════ */
+.phing-editor .footnote-def-node {
+  opacity: 0.58;
+  font-family: var(--font-ui);
+  font-size: 0.82em;
+  line-height: 1.55;
+  color: var(--muted);
+  border-left: 2.5px solid var(--primary);
+  padding-left: 10px;
+  margin-bottom: 0.3em !important;
+  border-radius: 0 4px 4px 0;
+  background: var(--primary-s);
+  transition: opacity 0.15s;
+}
+.phing-editor .footnote-def-node:hover {
+  opacity: 0.8;
+}
+
+/* ══════════════════════════════════════════════════════════
+   TOC PANEL SCROLLBAR
+   The panel's inner scroll area uses the global thin
+   scrollbar rules, but we also set scrollbar-width and
+   scrollbar-color for Firefox.
+   ═══════════════════════════════════════════════════════ */
+.editor-toc-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.editor-toc-scroll::-webkit-scrollbar       { width: 3px; }
+.editor-toc-scroll::-webkit-scrollbar-track { background: transparent; }
+.editor-toc-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 100px;
+}
+.editor-toc-scroll::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* ══════════════════════════════════════════════════════════
+   SIDEBAR NAVIGATION SCROLL ZONE
+   The scrollable middle zone (nav + pockets list) uses a
+   permanently reserved scrollbar gutter so the content
+   width never shifts when the scrollbar appears or
+   disappears (no layout reflow jitter).
+   ═══════════════════════════════════════════════════════ */
+.sidebar-nav-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.sidebar-nav-scroll::-webkit-scrollbar       { width: 3px; }
+.sidebar-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 100px;
+}
+.sidebar-nav-scroll::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* ══════════════════════════════════════════════════════════
+   MIND MAP DOCUMENT LIST
+   Left-sidebar panel for the new document-centric board.
+   Uses Liquid Glass / Taro Mochi aesthetic.
+   ═══════════════════════════════════════════════════════ */
+
+/* Container wrapper — sits inside .mm-board flex-row */
+.mm-list {
+  border-radius: 0; /* flush with the board edges */
+}
+
+/* Individual list items — action buttons are hidden until hover */
+.mm-list-item .mm-list-action {
+  opacity: 0;
+  transition: opacity 0.14s;
+}
+.mm-list-item:hover .mm-list-action {
+  opacity: 1;
+}
+
+/* ── Node label — wraps gracefully inside the pill ──────
+   white-space: normal  +  overflow-wrap: break-word  let
+   long labels (e.g. "Trade-Related Intellectual Property
+   Rights") wrap to the next line rather than spilling
+   outside the frosted-glass container.
+   estimateNodeHeight() accounts for wrapped lines so the
+   layout allocates the correct vertical space.           */
+.mm-node-label {
+  font-family:    var(--font-ui);
+  font-size:      13px;
+  font-weight:    500;
+  color:          var(--strong);
+  white-space:    normal;
+  overflow-wrap:  break-word;
+  word-break:     break-word;
+  text-align:     center;
+  line-height:    1.35;
+  pointer-events: none;
+  width:          100%;
+}
+
+.mm-node--root .mm-node-label {
+  font-family:    var(--font-serif);
+  font-size:      15px;
+  font-weight:    700;
+  letter-spacing: -0.2px;
+  line-height:    1.25;
+}
+
+.mm-node--l1 .mm-node-label {
+  font-size:   12px;
+  font-weight: 600;
+}
+
+/* ── Pocket filter strip above the map list ─────────────
+   Thin row of pill-shaped pocket filters.                */
+.mm-pocket-filter-strip::-webkit-scrollbar { display: none; }
+
+/* ══════════════════════════════════════════════════════════
+   CONFLICT DIALOGUE BUTTONS
+   Three-tier hierarchy: primary (reload), secondary (keep
+   local), ghost (dismiss).  All share base padding and
+   border-radius; colours and weight differentiate intent.
+   ═══════════════════════════════════════════════════════ */
+.conflict-btn {
+  width:         100%;
+  padding:       9px 14px;
+  border-radius: 9px;
+  border:        none;
+  font-family:   var(--font-ui);
+  font-size:     11px;
+  font-weight:   500;
+  cursor:        pointer;
+  transition:    background 0.15s, colour 0.15s, opacity 0.15s;
+  text-align:    center;
+}
+.conflict-btn--primary {
+  background: var(--primary);
+  color:      #fff;
+  font-weight: 600;
+}
+.conflict-btn--primary:hover  { opacity: 0.88; }
+.conflict-btn--secondary {
+  background: var(--primary-s);
+  color:      var(--primary);
+  border:     0.5px solid var(--primary);
+}
+.conflict-btn--secondary:hover { background: var(--primary-g); }
+.conflict-btn--ghost {
+  background: transparent;
+  color:      var(--muted);
+}
+.conflict-btn--ghost:hover {
+  background: var(--primary-s);
+  color:      var(--primary);
+}
+
