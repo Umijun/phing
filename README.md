@@ -44,7 +44,7 @@ Crafted with obsessive attention to detail using:
 
 ---
 <div align="center">
-  <sub>Built with care by a law student trying to survive late-night research.</sub>
+  <sub>Built with care by a Thai law student trying to survive late-night EU law research.</sub>
 </div>
 
 ---
