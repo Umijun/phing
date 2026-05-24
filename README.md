@@ -9,7 +9,7 @@
 ## 🌸 The Vision
 Most productivity tools feel like databases. **Phing** is different. It is a local-first, deeply aesthetic knowledge manager built for researchers, writers, and students who want their digital workspace to feel as calming as a quiet desk with a cup of tea. 
 
-Instead of overwhelming you with features, Phing focuses on **emotional UX**, robust typography, and a 'liquid glass' interface that respects your focus.
+Instead of overwhelming you with features, Phing focuses on **emotional UX**, robust typography, and an interface that respects your focus.
 
 ## 🖼️ Preview
 <div align="center">
