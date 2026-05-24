@@ -16,6 +16,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNoteStore, Pocket } from '../store/noteStore';
 import { useVaultStore } from '../store/vaultStore';
+// useNoteStore.getState() used inside drop handlers to avoid stale closures
 import { truncatePath, defaultVaultPath } from '../lib/vaultPaths';
 import { readAvatarFromFile } from '../lib/profileAvatar';
 import { isTauri } from '../lib/tauri';
@@ -50,7 +51,14 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
     loadVault,
     createFolder,
     deleteFolder,
+    moveNote,
   } = useNoteStore();
+
+  // ── Drag-and-drop state ────────────────────────────────────────────────────
+  // null  = nothing being dragged over
+  // ''    = "All Notes" drop target active
+  // id    = pocket with that id is the drop target
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const { vaultPath, setVaultPath } = useVaultStore();
   const t: LangStrings = lang === 'th' ? i18n.th : i18n.en;
 
@@ -95,6 +103,34 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
     setNewPocketName('');
     setNewPocketOpen(false);
   };
+
+  // ── Shared drag-event helpers ──────────────────────────────────────────────
+  const makeDragHandlers = (targetId: string) => ({
+    onDragOver: (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragOverId !== targetId) setDragOverId(targetId);
+    },
+    onDragLeave: (e: React.DragEvent<HTMLDivElement>) => {
+      // Only clear when truly leaving the element (not entering a child).
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+        setDragOverId(null);
+      }
+    },
+    onDrop: (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setDragOverId(null);
+      const noteId = e.dataTransfer.getData('text/plain');
+      if (!noteId) return;
+      // Read live state to avoid stale closure; skip if already in this pocket.
+      const note = useNoteStore.getState().notes.find((n) => n.id === noteId);
+      if (!note || note.folder === targetId) return;
+      void moveNote(noteId, targetId);
+      // Navigate to the destination pocket so the user can see the drop landed.
+      setActivePocket(targetId);
+      if (targetId !== '') onViewChange?.('notes');
+    },
+  });
 
   const applyVault = async (path: string) => {
     if (isTauri()) {
@@ -205,7 +241,9 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
             label={t.all}
             icon="≡"
             active={activePocket === '' && view !== 'board'}
+            isDropTarget={dragOverId === ''}
             onClick={() => { onViewChange?.('notes'); setActivePocket(''); }}
+            dragHandlers={makeDragHandlers('')}
           />
           <NavItem
             label="Board"
@@ -222,6 +260,8 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
             {pockets.map((p: Pocket) => {
               const isActive    = activePocket === p.id;
               const isDeleting  = confirmDeletePocket === p.id;
+              const isDropTarget = dragOverId === p.id;
+              const handlers = makeDragHandlers(p.id);
               return (
                 <motion.div
                   key={p.id}
@@ -229,76 +269,88 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                   transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-                  // whileHover is on the inner div so the exit animation works cleanly
                   style={{ overflow: 'hidden' }}
                 >
+                  {/* ── Drop-target spring scale wrapper ──────────────────── */}
                   <motion.div
-                    whileHover={{
-                      background: isActive ? 'var(--primary-g)' : 'var(--primary-s)',
-                      color:      'var(--primary)',
-                    }}
-                    onClick={() => setActivePocket(p.id)}
-                    style={{
-                      display:     'flex',
-                      alignItems:  'center',
-                      gap:          8,
-                      // 2px left border is always present (transparent when inactive)
-                      // so the content never shifts when a pocket becomes active.
-                      borderLeft:  `2px solid ${isActive ? 'var(--primary)' : 'transparent'}`,
-                      padding:     '6px 10px 6px 8px',
-                      borderRadius: '0 var(--r-sm) var(--r-sm) 0',
-                      cursor:      'pointer',
-                      fontSize:     11,
-                      marginBottom: 2,
-                      color:       isActive ? 'var(--primary)' : 'var(--muted)',
-                      background:  isActive ? 'var(--primary-g)' : 'transparent',
-                      fontWeight:  isActive ? 600 : 400,
-                      position:   'relative',
-                      overflow:   'hidden',
-                      transition: 'background 0.15s, colour 0.15s',
-                    }}
-                    className="sidebar-pocket-item"
+                    animate={{ scale: isDropTarget ? 1.025 : 1 }}
+                    transition={{ type: 'spring', stiffness: 600, damping: 35 }}
+                    style={{ transformOrigin: 'left center' }}
                   >
-                    {/* Colour dot indicator */}
-                    <div
-                      style={{
-                        width:        7,
-                        height:       7,
-                        borderRadius: '50%',
-                        background:   p.color,
-                        boxShadow:    `0 0 6px ${p.color}80`,
-                        flexShrink:   0,
+                    <motion.div
+                      whileHover={{
+                        background: isActive ? 'var(--primary-g)' : 'var(--primary-s)',
+                        color:      'var(--primary)',
                       }}
-                    />
-                    {/* Pocket name — truncates with ellipsis on narrow sidebar */}
-                    <span
+                      onClick={() => setActivePocket(p.id)}
+                      // ── Drop target handlers ─────────────────────────────
+                      onDragOver={handlers.onDragOver}
+                      onDragLeave={handlers.onDragLeave}
+                      onDrop={handlers.onDrop}
+                      className={`sidebar-pocket-item${isDropTarget ? ' sidebar-pocket-item--droptarget' : ''}`}
                       style={{
-                        flex:         1,
+                        display:      'flex',
+                        alignItems:   'center',
+                        gap:           8,
+                        borderLeft:   `2px solid ${isDropTarget || isActive ? 'var(--primary)' : 'transparent'}`,
+                        padding:      '6px 10px 6px 8px',
+                        borderRadius: '0 var(--r-sm) var(--r-sm) 0',
+                        cursor:       'pointer',
+                        fontSize:      11,
+                        marginBottom:  2,
+                        color:         isDropTarget ? 'var(--primary)' : isActive ? 'var(--primary)' : 'var(--muted)',
+                        background:    isDropTarget ? 'var(--primary-s)' : isActive ? 'var(--primary-g)' : 'transparent',
+                        fontWeight:    isActive ? 600 : 400,
+                        position:     'relative',
                         overflow:     'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace:   'nowrap',
+                        transition:   'background 0.12s, color 0.12s, border-color 0.12s',
                       }}
                     >
-                      {p.emoji} {p.name}
-                    </span>
-                    {/* Delete button — revealed on hover via CSS */}
-                    <button
-                      type="button"
-                      className="sidebar-pocket-delete"
-                      onClick={(e) => onDeletePocket(p.id, e)}
-                      title={isDeleting ? 'Click again to delete' : 'Delete pocket'}
-                      style={{
-                        opacity:    isDeleting ? 1 : undefined,
-                        color:      isDeleting ? '#FF5252' : undefined,
-                        background: isDeleting ? 'rgba(255,82,82,0.1)' : undefined,
-                        fontSize:   9,
-                        fontWeight: 700,
-                        padding:    '2px 5px',
-                        borderRadius: 5,
-                      }}
-                    >
-                      {isDeleting ? 'del?' : '✕'}
-                    </button>
+                      {/* Colour dot — pulses gently when the pocket is a live drop target */}
+                      <motion.div
+                        animate={isDropTarget
+                          ? { scale: [1, 1.55, 1], transition: { repeat: Infinity, duration: 0.85, ease: 'easeInOut' } }
+                          : { scale: 1, transition: { type: 'spring', stiffness: 400, damping: 20 } }
+                        }
+                        style={{
+                          width:        7,
+                          height:       7,
+                          borderRadius: '50%',
+                          background:   p.color,
+                          boxShadow:    isDropTarget ? `0 0 10px ${p.color}cc` : `0 0 6px ${p.color}80`,
+                          flexShrink:   0,
+                        }}
+                      />
+                      {/* Pocket name — truncates with ellipsis on narrow sidebar */}
+                      <span
+                        style={{
+                          flex:         1,
+                          overflow:     'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace:   'nowrap',
+                        }}
+                      >
+                        {p.emoji} {p.name}
+                      </span>
+                      {/* Delete button — revealed on hover via CSS */}
+                      <button
+                        type="button"
+                        className="sidebar-pocket-delete"
+                        onClick={(e) => onDeletePocket(p.id, e)}
+                        title={isDeleting ? 'Click again to delete' : 'Delete pocket'}
+                        style={{
+                          opacity:      isDeleting ? 1 : undefined,
+                          color:        isDeleting ? '#FF5252' : undefined,
+                          background:   isDeleting ? 'rgba(255,82,82,0.1)' : undefined,
+                          fontSize:     9,
+                          fontWeight:   700,
+                          padding:      '2px 5px',
+                          borderRadius: 5,
+                        }}
+                      >
+                        {isDeleting ? 'del?' : '✕'}
+                      </button>
+                    </motion.div>
                   </motion.div>
                 </motion.div>
               );
@@ -495,32 +547,41 @@ const SectionLabel = ({ label }: { label: string }) => (
 );
 
 const NavItem = ({
-  label, icon, active, onClick,
+  label, icon, active, onClick, isDropTarget = false, dragHandlers,
 }: {
-  label:   string;
-  icon:    string;
-  active:  boolean;
-  onClick: () => void;
+  label:         string;
+  icon:          string;
+  active:        boolean;
+  onClick:       () => void;
+  isDropTarget?: boolean;
+  dragHandlers?: {
+    onDragOver:  (e: React.DragEvent<HTMLDivElement>) => void;
+    onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
+    onDrop:      (e: React.DragEvent<HTMLDivElement>) => void;
+  };
 }) => (
   <motion.div
     whileHover={{ background: 'var(--primary-s)', color: 'var(--primary)' }}
     transition={springHover}
     onClick={onClick}
+    onDragOver={dragHandlers?.onDragOver}
+    onDragLeave={dragHandlers?.onDragLeave}
+    onDrop={dragHandlers?.onDrop}
+    className={isDropTarget ? 'sidebar-pocket-item--droptarget' : undefined}
     style={{
       display:      'flex',
       alignItems:   'center',
       gap:          7,
-      // Mirror the 2px left-border reservation used by pocket items so
-      // all list items stay horizontally aligned regardless of active state.
-      borderLeft:   `2px solid ${active ? 'var(--primary)' : 'transparent'}`,
+      borderLeft:   `2px solid ${isDropTarget || active ? 'var(--primary)' : 'transparent'}`,
       padding:      '6px 10px 6px 8px',
       borderRadius: '0 var(--r-sm) var(--r-sm) 0',
       cursor:       'pointer',
       fontSize:     11,
       marginBottom: 1,
-      color:        active ? 'var(--primary)' : 'var(--muted)',
-      background:   active ? 'var(--primary-g)' : 'transparent',
+      color:        isDropTarget || active ? 'var(--primary)' : 'var(--muted)',
+      background:   isDropTarget ? 'var(--primary-s)' : active ? 'var(--primary-g)' : 'transparent',
       fontWeight:   active ? 600 : 400,
+      transition:   'background 0.12s, color 0.12s, border-color 0.12s',
     }}
   >
     <span>{icon}</span> {label}

@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNoteStore, Note, Pocket } from '../store/noteStore';
 import { stripMarkdown } from '../lib/stripMarkdown';
@@ -111,10 +111,38 @@ const NoteCard = memo(({
   const deleteNote = useNoteStore((s) => s.deleteNote);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDragging,    setIsDragging]    = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Expensive computations are memoised per-card
   const snip = useMemo(() => stripMarkdown(note.content), [note.content]);
   const ago  = useMemo(() => formatNoteDate(note.updatedAt), [note.updatedAt]);
+
+  // Attach HTML5 drag events imperatively — framer-motion overrides the
+  // React onDragStart type for its own pointer-based drag API, so we bypass
+  // the type conflict by using native DOM listeners on the element ref.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    el.draggable = true;
+
+    const onDragStart = (e: DragEvent) => {
+      if (!e.dataTransfer) return;
+      e.dataTransfer.setData('text/plain', note.id);
+      e.dataTransfer.effectAllowed = 'move';
+      // Tiny delay so the browser snapshots the pre-transform card as the
+      // drag ghost image before framer-motion applies the lift variants.
+      requestAnimationFrame(() => setIsDragging(true));
+    };
+    const onDragEnd = () => setIsDragging(false);
+
+    el.addEventListener('dragstart', onDragStart);
+    el.addEventListener('dragend',   onDragEnd);
+    return () => {
+      el.removeEventListener('dragstart', onDragStart);
+      el.removeEventListener('dragend',   onDragEnd);
+    };
+  }, [note.id]); // note.id is stable per mounted NoteCard
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -129,24 +157,40 @@ const NoteCard = memo(({
 
   return (
     <motion.div
-      // No entry animation — avoids replaying on filter/select changes
-      exit={{ opacity: 0, scale: 0.96, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
-      transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-      // Subtle hover — no y-offset (avoids layout reflow)
-      whileHover={{ scale: 1.012, boxShadow: '0 6px 22px var(--primary-g)' }}
-      whileTap={{ scale: 0.99 }}
-      onClick={() => void selectNote(note.id)}
+      // ── Exit: slide-shrink out of the list ──────────────────────────────
+      exit={{
+        opacity: 0, scale: 0.94, height: 0,
+        marginBottom: 0, paddingTop: 0, paddingBottom: 0,
+        transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] },
+      }}
+      // ── Drag-lift: lifted card floats above the list ─────────────────────
+      variants={{
+        idle:     { scale: 1, rotate: 0, opacity: 1,
+                    transition: { type: 'spring', stiffness: 500, damping: 32 } },
+        dragging: { scale: 1.05, rotate: 1.6, opacity: 0.72,
+                    transition: { type: 'spring', stiffness: 500, damping: 32 } },
+      }}
+      animate={isDragging ? 'dragging' : 'idle'}
+      // Disable hover/tap feedback while dragging so they don't fight the lift
+      whileHover={isDragging ? undefined : { scale: 1.012, boxShadow: '0 6px 22px var(--primary-g)' }}
+      whileTap={isDragging   ? undefined : { scale: 0.99 }}
+      // ref wires up HTML5 drag events (see useEffect above)
+      ref={cardRef}
+      onClick={() => { if (!isDragging) void selectNote(note.id); }}
       className={active ? 'note-card note-card--active' : 'note-card'}
       style={{
-        background: 'var(--card)',
+        background:   'var(--card)',
         borderRadius: 16,
-        padding: '14px 16px 12px',
-        cursor: 'pointer',
-        border: active ? '0.5px solid var(--primary)' : '0.5px solid var(--border)',
-        boxShadow: active ? undefined : '0 1px 4px rgba(0,0,0,0.04)',
-        position: 'relative',
-        overflow: 'hidden',
-        willChange: 'transform',
+        padding:      '14px 16px 12px',
+        cursor:       isDragging ? 'grabbing' : 'grab',
+        border:       active ? '0.5px solid var(--primary)' : '0.5px solid var(--border)',
+        boxShadow:    isDragging
+          ? '0 20px 50px rgba(0,0,0,0.16), 0 4px 18px var(--primary-g)'
+          : active ? undefined : '0 1px 4px rgba(0,0,0,0.04)',
+        position:     'relative',
+        overflow:     'hidden',
+        willChange:   'transform',
+        userSelect:   'none',
       }}
     >
       {/* Title row */}
