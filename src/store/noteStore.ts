@@ -448,7 +448,12 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       try {
         await vaultService.deleteNoteFile(vaultPath, note.filePath);
       } catch (e) {
-        console.error('[phing] deleteNote failed', e);
+        // The file delete failed (e.g. permissions error, unsupported FS).
+        // Do NOT remove the note from state — leaving it visible is far safer
+        // than hiding it while the file stays on disk (which causes it to
+        // reappear as a ghost on the next vault load).
+        console.error('[phing] deleteNote failed — note kept in state', e);
+        return;
       }
     }
     set((s) => {

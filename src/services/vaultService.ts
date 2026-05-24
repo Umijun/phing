@@ -7,15 +7,20 @@ import {
   rename,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { decodeNote, encodeNote } from '../lib/frontmatter';
 import { captureSnapshot } from '../lib/recoveryJournal';
 import type { Note } from '../store/noteStore';
 
+// Normalise all backslashes to forward slashes before joining so that vault
+// paths returned by Tauri's file dialog on Windows (e.g. C:\Users\Alice\vault)
+// don't produce mixed-separator strings that confuse trash::delete / the FS API.
 const joinPath = (...parts: string[]) =>
   parts
     .filter(Boolean)
     .join('/')
+    .replace(/\\/g, '/')
     .replace(/\/+/g, '/');
 
 /** Obsidian-style filename from note title. */
@@ -153,9 +158,7 @@ export async function writeNote(
   if (previousRelativePath && previousRelativePath !== rel) {
     const oldAbs = joinPath(vaultPath, previousRelativePath);
     if (await exists(oldAbs)) {
-      if (await exists(abs)) {
-        await remove(abs);
-      }
+      if (await exists(abs)) await invoke('trash_file', { path: abs });
       await rename(oldAbs, abs);
     }
   }
@@ -196,7 +199,10 @@ export async function atomicWriteNote(
   if (previousRelativePath && previousRelativePath !== rel) {
     const oldAbs = joinPath(vaultPath, previousRelativePath);
     if (await exists(oldAbs)) {
-      if (await exists(abs)) await remove(abs);
+      // If a note already exists at the destination, move it to Trash rather
+      // than hard-deleting it — consistent with the explicit delete behaviour
+      // and recoverable if the collision was unintentional.
+      if (await exists(abs)) await invoke('trash_file', { path: abs });
       await rename(oldAbs, abs);
     }
   }
@@ -237,9 +243,17 @@ export async function readNote(vaultPath: string, relPath: string): Promise<Note
   }
 }
 
+/**
+ * Move a note file to the system Trash rather than permanently deleting it.
+ *
+ * Using the OS trash means the user can recover an accidentally-deleted note
+ * from Finder / Explorer / the desktop file-manager until they empty the
+ * Trash themselves.  The `trash_file` Tauri command wraps the `trash` Rust
+ * crate which handles macOS, Windows, and Linux (XDG) natively.
+ */
 export async function deleteNoteFile(vaultPath: string, relativePath: string): Promise<void> {
   const abs = joinPath(vaultPath, relativePath);
   if (await exists(abs)) {
-    await remove(abs);
+    await invoke('trash_file', { path: abs });
   }
 }

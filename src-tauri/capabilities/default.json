@@ -9,6 +9,7 @@
     "fs:default",
     "fs:allow-watch",
     "fs:allow-rename",
+    "fs:allow-remove",
     "dialog:default",
     "fs:scope-home-recursive",
     "fs:scope-document-recursive"
