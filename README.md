@@ -93,3 +93,6 @@ Crafted with obsessive attention to detail using:
 * **File watcher:** Detects external changes and prompts a Conflict Dialogue (Reload / Keep local).
 
 </details>
+
+## 🌸 License
+Phing is open-sourced software generously licensed under the [MIT license](LICENSE). Feel free to use, modify, and build upon it to create your own peaceful workspace!
