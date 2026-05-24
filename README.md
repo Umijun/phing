@@ -94,5 +94,16 @@ Crafted with obsessive attention to detail using:
 
 </details>
 
+---
+## 🍎 Note for macOS Users
+
+If you encounter a 'damaged and cannot be opened' error when launching the app, this is due to macOS Gatekeeper blocking applications not signed with an Apple Developer Certificate. You can safely bypass this by running the following command in your Terminal:
+
+
+xattr -cr /Applications/phing.app
+
+(Please ensure the app is moved to your /Applications folder before running this command.)
+
+---
 ## 🌸 License
 Phing is open-sourced software generously licensed under the [MIT license](LICENSE). Feel free to use, modify, and build upon it to create your own peaceful workspace!
