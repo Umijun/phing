@@ -206,7 +206,14 @@ const App = () => {
   useEffect(() => {
     if (!isTauri()) return;
 
-    let unlistenClose: (() => void) | undefined;
+    // `closer` is a mutable object shared between the async registration IIFE
+    // and the synchronous cleanup function.  A plain `let unlisten` variable
+    // doesn't work because React's cleanup runs synchronously while the IIFE
+    // may still be awaiting its Tauri registration — `unlisten` would still be
+    // `undefined` at cleanup time, permanently leaking the IPC listener.
+    // By using a shared object we can both set the fn when it resolves AND
+    // check whether cleanup already ran, calling unlisten immediately if so.
+    const closer = { fn: undefined as (() => void) | undefined, active: true };
 
     void (async () => {
       try {
@@ -218,10 +225,15 @@ const App = () => {
         // win.destroy() themselves, so we never need to close here directly.
         // Removing the hasPendingWrites() gate prevents the race where the
         // 100 ms debounce has already completed by the time the user presses ×.
-        unlistenClose = await win.onCloseRequested((event) => {
+        const unlisten = await win.onCloseRequested((event) => {
           event.preventDefault();
           setQuitPending(true);
         });
+        if (closer.active) {
+          closer.fn = unlisten; // effect still mounted — store for cleanup
+        } else {
+          unlisten(); // effect cleaned up while we were awaiting — deregister now
+        }
       } catch (e) {
         console.error('[phing] Failed to register onCloseRequested:', e);
       }
@@ -233,7 +245,8 @@ const App = () => {
     document.addEventListener('visibilitychange', onHidden);
 
     return () => {
-      unlistenClose?.();
+      closer.active = false;
+      closer.fn?.();
       window.removeEventListener('pagehide', flushFire);
       document.removeEventListener('visibilitychange', onHidden);
     };
@@ -247,20 +260,31 @@ const App = () => {
   useEffect(() => {
     if (!isTauri()) return;
 
-    let unlisten: (() => void) | undefined;
+    // Same `closer` pattern as the onCloseRequested effect above — prevents
+    // the IPC listener leaking when the effect cleans up before the async
+    // `listen()` call resolves (e.g. during HMR hot-reload).
+    const closer = { fn: undefined as (() => void) | undefined, active: true };
 
     void (async () => {
       try {
         const { listen } = await import('@tauri-apps/api/event');
-        unlisten = await listen('phing://close-requested', () => {
+        const unlisten = await listen('phing://close-requested', () => {
           setQuitPending(true);
         });
+        if (closer.active) {
+          closer.fn = unlisten;
+        } else {
+          unlisten();
+        }
       } catch (e) {
         console.error('[phing] Failed to register phing://close-requested listener:', e);
       }
     })();
 
-    return () => { unlisten?.(); };
+    return () => {
+      closer.active = false;
+      closer.fn?.();
+    };
   }, []);
 
   const handleKeyDown = useCallback(

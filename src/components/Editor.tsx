@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import EmojiPicker from './EmojiPicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEditor, EditorContent, Editor as TipTapEditor } from '@tiptap/react';
 import {
@@ -684,20 +685,30 @@ const Editor = ({ onOpenPalette }: EditorProps) => {
               {pocket?.name ?? 'Notes'} · {fmt(note.createdAt)}
             </div>
 
-            <div
-              ref={titleRef}
-              className="editor-title"
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={onTitleBlur}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  descRef.current?.focus();
-                }
-              }}
-              data-placeholder="Note title..."
-            />
+            {/* Title row: emoji trigger + contenteditable title */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+              <EmojiPicker
+                emoji={note.emoji}
+                defaultEmoji="📄"
+                large
+                onSelect={(em) => patchNote(note.id, { emoji: em })}
+              />
+              <div
+                ref={titleRef}
+                className="editor-title"
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={onTitleBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    descRef.current?.focus();
+                  }
+                }}
+                data-placeholder="Note title..."
+                style={{ flex: 1, marginBottom: 0 }}
+              />
+            </div>
 
             <div
               ref={descRef}

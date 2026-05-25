@@ -1,4 +1,6 @@
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use serde::Serialize;
 use tauri::{Emitter, Manager};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 
@@ -9,12 +11,92 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 
 struct QuitConfirmed(AtomicBool);
 
+// ── Vault tree ────────────────────────────────────────────────────────────────
+
+/// A single node in the vault file-system tree returned by `scan_vault_tree`.
+/// `#[serde(rename_all = "camelCase")]` maps snake_case Rust fields to the
+/// camelCase the TypeScript side expects — no manual conversion needed.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct FileNode {
+    name:     String,
+    /// Absolute path with forward-slash separators (normalised on all platforms).
+    path:     String,
+    is_dir:   bool,
+    children: Vec<FileNode>,
+}
+
+/// Recursively walks `dir`, skipping hidden entries (name starts with `.`)
+/// and `.tmp` temp-files left by atomic writes.  Directories come before
+/// files within each level; both groups are sorted case-insensitively.
+fn scan_recursive(dir: &Path) -> FileNode {
+    let name = dir
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let path = dir.to_string_lossy().replace('\\', "/");
+
+    let mut dirs:  Vec<FileNode> = Vec::new();
+    let mut files: Vec<FileNode> = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            let n = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+
+            // Skip hidden items (.phing, .obsidian, .git, etc.) and temp files
+            if n.starts_with('.') || n.ends_with(".tmp") {
+                continue;
+            }
+
+            if p.is_dir() {
+                dirs.push(scan_recursive(&p));
+            } else if n.to_lowercase().ends_with(".md") {
+                files.push(FileNode {
+                    name:     n,
+                    path:     p.to_string_lossy().replace('\\', "/"),
+                    is_dir:   false,
+                    children: Vec::new(),
+                });
+            }
+        }
+    }
+
+    dirs.sort_by( |a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    dirs.extend(files);
+
+    FileNode { name, path, is_dir: true, children: dirs }
+}
+
 // ── Commands ──────────────────────────────────────────────────────────────────
 
 /// Move a file or directory to the system Trash / Recycle Bin.
 #[tauri::command]
 fn trash_file(path: String) -> Result<(), String> {
     trash::delete(&path).map_err(|e| format!("trash_file failed for {path}: {e}"))
+}
+
+/// Return the full recursive `FileNode` tree rooted at `vault_path`.
+/// The root node represents the vault folder itself; callers render its
+/// `children` to display the tree without an extra top-level wrapper.
+#[tauri::command]
+fn scan_vault_tree(vault_path: String) -> Result<FileNode, String> {
+    let path = Path::new(&vault_path);
+    if !path.exists() {
+        return Err(format!("vault path does not exist: {vault_path}"));
+    }
+    Ok(scan_recursive(path))
+}
+
+/// Rename (or move) a file or directory — wraps `std::fs::rename` so it works
+/// on directories as well as files.  The Tauri `fs` plugin's `rename` only
+/// covers files; this command handles the folder-rename case.
+#[tauri::command]
+fn rename_path(from: String, to: String) -> Result<(), String> {
+    std::fs::rename(&from, &to)
+        .map_err(|e| format!("rename_path failed ({from} → {to}): {e}"))
 }
 
 /// Called by the frontend after the user confirms quit ("Save & Quit" or
@@ -117,7 +199,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![trash_file, confirm_quit])
+        .invoke_handler(tauri::generate_handler![
+            trash_file,
+            confirm_quit,
+            scan_vault_tree,
+            rename_path,
+        ])
         .setup(|app| {
             build_app_menu(app)?;
             Ok(())

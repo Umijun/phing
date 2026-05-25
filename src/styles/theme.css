@@ -241,16 +241,28 @@
   --spring:     0.38s cubic-bezier(0.34,1.56,0.64,1);
   --smooth:     0.28s cubic-bezier(0.4,0,0.2,1);
 
-  /* ── Mind-map branch colours (light mode — calm Taro Mochi pastels) ──── */
-  /* Each pair: --branch-N-rgb for rgba() composition; --branch-N for direct use. */
-  --branch-1-rgb: 200, 152, 152; --branch-1: rgb(200, 152, 152); /* Dusty Rose   */
-  --branch-2-rgb: 148, 180, 154; --branch-2: rgb(148, 180, 154); /* Sage Mist    */
-  --branch-3-rgb: 143, 170, 200; --branch-3: rgb(143, 170, 200); /* Periwinkle   */
-  --branch-4-rgb: 200, 173, 144; --branch-4: rgb(200, 173, 144); /* Warm Peach   */
-  --branch-5-rgb: 138, 184, 180; --branch-5: rgb(138, 184, 180); /* Soft Teal    */
-  --branch-6-rgb: 168, 148, 200; --branch-6: rgb(168, 148, 200); /* Iris         */
-  --branch-7-rgb: 196, 162, 148; --branch-7: rgb(196, 162, 148); /* Clay Rose    */
-  --branch-8-rgb: 138, 180, 200; --branch-8: rgb(138, 180, 200); /* Sky Mist     */
+  /* ── Mind-map branch colours — aliased to the Pocket palette ─────────── */
+  /* Single source of truth: branch colours now mirror the pocket colours   */
+  /* so the sidebar left-borders and mind-map edges share one pastel system. */
+  --branch-1-rgb: var(--pocket-color-1-rgb); --branch-1: var(--pocket-color-1);
+  --branch-2-rgb: var(--pocket-color-2-rgb); --branch-2: var(--pocket-color-2);
+  --branch-3-rgb: var(--pocket-color-3-rgb); --branch-3: var(--pocket-color-3);
+  --branch-4-rgb: var(--pocket-color-4-rgb); --branch-4: var(--pocket-color-4);
+  --branch-5-rgb: var(--pocket-color-5-rgb); --branch-5: var(--pocket-color-5);
+  --branch-6-rgb: var(--pocket-color-6-rgb); --branch-6: var(--pocket-color-6);
+  --branch-7-rgb: var(--pocket-color-7-rgb); --branch-7: var(--pocket-color-7);
+  --branch-8-rgb: var(--pocket-color-8-rgb); --branch-8: var(--pocket-color-8);
+
+  /* ── Pocket dot palette (light mode — warm Taro Mochi pastels) ──────────── */
+  /* Same pattern as branch: -rgb for rgba() in box-shadows; plain for background. */
+  --pocket-color-1-rgb: 196, 158, 158; --pocket-color-1: rgb(196, 158, 158); /* Petal Rose    */
+  --pocket-color-2-rgb: 152, 188, 158; --pocket-color-2: rgb(152, 188, 158); /* Sage          */
+  --pocket-color-3-rgb: 152, 172, 208; --pocket-color-3: rgb(152, 172, 208); /* Slate Blue    */
+  --pocket-color-4-rgb: 208, 188, 158; --pocket-color-4: rgb(208, 188, 158); /* Warm Toffee   */
+  --pocket-color-5-rgb: 152, 200, 196; --pocket-color-5: rgb(152, 200, 196); /* Soft Teal     */
+  --pocket-color-6-rgb: 188, 160, 208; --pocket-color-6: rgb(188, 160, 208); /* Wisteria      */
+  --pocket-color-7-rgb: 208, 178, 158; --pocket-color-7: rgb(208, 178, 158); /* Clay          */
+  --pocket-color-8-rgb: 152, 188, 208; --pocket-color-8: rgb(152, 188, 208); /* Sky Mist      */
 }
 
 .dark {
@@ -272,15 +284,17 @@
   --h4:         #FF8A8A;
   --h5:         #AEC6CF;
 
-  /* ── Mind-map branch colours (dark mode — ~12 RGB units brighter/more saturated) */
-  --branch-1-rgb: 212, 168, 168; --branch-1: rgb(212, 168, 168); /* Dusty Rose   */
-  --branch-2-rgb: 168, 200, 174; --branch-2: rgb(168, 200, 174); /* Sage Mist    */
-  --branch-3-rgb: 164, 190, 220; --branch-3: rgb(164, 190, 220); /* Periwinkle   */
-  --branch-4-rgb: 220, 193, 164; --branch-4: rgb(220, 193, 164); /* Warm Peach   */
-  --branch-5-rgb: 158, 204, 200; --branch-5: rgb(158, 204, 200); /* Soft Teal    */
-  --branch-6-rgb: 188, 168, 220; --branch-6: rgb(188, 168, 220); /* Iris         */
-  --branch-7-rgb: 212, 182, 168; --branch-7: rgb(212, 182, 168); /* Clay Rose    */
-  --branch-8-rgb: 158, 200, 220; --branch-8: rgb(158, 200, 220); /* Sky Mist     */
+  /* ── Branch colours inherit from dark Pocket palette (aliases cascade) ── */
+
+  /* ── Pocket dot palette (dark — Midnight Snow, +20 for legibility, no glare) */
+  --pocket-color-1-rgb: 216, 178, 178; --pocket-color-1: rgb(216, 178, 178); /* Petal Rose    */
+  --pocket-color-2-rgb: 172, 208, 178; --pocket-color-2: rgb(172, 208, 178); /* Sage          */
+  --pocket-color-3-rgb: 172, 192, 224; --pocket-color-3: rgb(172, 192, 224); /* Slate Blue    */
+  --pocket-color-4-rgb: 224, 204, 172; --pocket-color-4: rgb(224, 204, 172); /* Warm Toffee   */
+  --pocket-color-5-rgb: 172, 216, 212; --pocket-color-5: rgb(172, 216, 212); /* Soft Teal     */
+  --pocket-color-6-rgb: 204, 176, 224; --pocket-color-6: rgb(204, 176, 224); /* Wisteria      */
+  --pocket-color-7-rgb: 224, 194, 172; --pocket-color-7: rgb(224, 194, 172); /* Clay          */
+  --pocket-color-8-rgb: 172, 204, 224; --pocket-color-8: rgb(172, 204, 224); /* Sky Mist      */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1098,6 +1112,115 @@ textarea,
   background: var(--primary-g);
 }
 
+/* ── File Tree ──────────────────────────────────────────── */
+
+/* Folder rows */
+.file-tree-folder {
+  display:     flex;
+  align-items: center;
+  gap:         5px;
+  padding-top:    4px;
+  padding-bottom: 4px;
+  padding-right:  6px;
+  border-left:    2px solid transparent;
+  border-radius:  0 var(--r-sm) var(--r-sm) 0;
+  color:          var(--muted);
+  cursor:         pointer;
+  transition:     background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.file-tree-folder--active {
+  /* background is driven by the pocket-tinted Framer Motion animate prop;
+     we do NOT use !important here so inline styles can override it.        */
+  color:             var(--primary);
+  border-left-color: var(--primary); /* fallback for sub-folders without a pocket */
+  font-weight:       600;
+}
+
+/* Drop-target inset glow ring — appears while a note is dragged over */
+.file-tree-folder--droptarget {
+  box-shadow:   inset 0 0 0 1px var(--primary), 0 0 16px var(--primary-g);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+
+/* Taro-tinted expand/collapse arrow */
+.file-tree-arrow {
+  color:       var(--primary);
+  font-size:   11px;
+  width:       12px;
+  flex-shrink: 0;
+  opacity:     0.65;
+  line-height: 1;
+  font-style:  normal;
+}
+
+/* Note (leaf) rows */
+.file-tree-note {
+  display:        flex;
+  align-items:    center;
+  gap:            5px;
+  padding-top:    3px;
+  padding-bottom: 3px;
+  padding-right:  6px;
+  border-left:    2px solid transparent;
+  border-radius:  0 var(--r-sm) var(--r-sm) 0;
+  color:          var(--soft);
+  font-size:      10.5px;
+  cursor:         pointer;
+  transition:     background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.file-tree-note--active {
+  color:            var(--primary)  !important;
+  background:       var(--primary-s) !important;
+  border-left-color: var(--primary) !important;
+  font-weight:      500;
+}
+
+/* Greyed out when the note isn't loaded into the store yet */
+.file-tree-note--unloaded {
+  opacity: 0.45;
+  cursor:  default;
+}
+
+/* Hover-revealed action buttons */
+.file-tree-actions {
+  display:     none;
+  align-items: center;
+  gap:         2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.file-tree-folder:hover .file-tree-actions {
+  display: flex;
+}
+
+.file-tree-action-btn {
+  border:        none;
+  background:    transparent;
+  color:         var(--soft);
+  cursor:        pointer;
+  font-size:     9px;
+  font-weight:   700;
+  padding:       1px 4px;
+  border-radius: 4px;
+  font-family:   var(--font-ui);
+  line-height:   1;
+  transition:    background 0.12s, color 0.12s;
+}
+
+.file-tree-action-btn:hover {
+  background: var(--primary-s);
+  color:      var(--primary);
+}
+
+.file-tree-action-btn--danger,
+.file-tree-action-btn--danger:hover {
+  background: rgba(255, 82, 82, 0.12);
+  color:      #FF5252;
+}
+
 .editor-empty-hint {
   font-family: var(--font-serif);
   font-style: italic;
@@ -1456,40 +1579,197 @@ textarea,
   pointer-events: none;
 }
 
-/* ── PDF / Print export ─────────────────────────────────────
-   Applied when window.print() is triggered via the toolbar.
-   Forces A4, Lora body, hides all chrome.                   */
+/* ── PDF / Print export ──────────────────────────────────────────────────────
+   Applied when window.print() is triggered (browser native print, ⌘P, or a
+   future "Print…" toolbar button).  The html2canvas-based "↓ pdf" path in
+   pdfExport.ts is entirely separate and bypasses these rules.
+
+   Core principle: the document must be a PRISTINE WHITE PAGE.
+   ────────────────────────────────────────────────────────────
+   The previous version applied color-adjust: exact to * (every element).
+   That forced the browser to print the app's cream #F9F6FA body background,
+   the Academic A4 floating-card box-shadow, sidebar tints, and every other
+   decorative UI surface — producing a UI screenshot rather than a document.
+
+   The correct model:
+     • Structural containers (html, body, editor wrappers) → force white,
+       no shadows, no borders.  The browser's default ink-saving stripping
+       then acts as our ally, not our enemy.
+     • Content elements that intentionally carry colour (tag pills, code
+       blocks, mind-map nodes) → selectively opt into color-adjust: exact
+       so only their fills are preserved.
+   ──────────────────────────────────────────────────────────────────────────── */
 @media print {
+
+  /* ── 1. White document base ───────────────────────────────────────────────
+     Force pure white on the root and every structural wrapper so the page
+     background is never the app's cream theme colour.  box-shadow: none
+     removes the floating-card effect from the Academic A4 surface.          */
+  html,
+  body {
+    background: #ffffff !important;
+    color:      #1a1a1a !important;
+  }
+
+  /* Strip every decorative UI surface — shadows, borders, rounded corners,
+     themed padding — from the editor stack.  @page margin handles spacing.  */
+  .editor-root,
+  .editor-scroll,
+  .editor-surface,
+  .editor-scroll.academic-mode,
+  .editor-scroll.academic-mode .editor-surface {
+    background:    #ffffff !important;
+    box-shadow:    none    !important;
+    border:        none    !important;
+    border-radius: 0       !important;
+    /* Remove the fixed A4 card width so content fills the page naturally.   */
+    width:         100%    !important;
+    max-width:     none    !important;
+    min-height:    unset   !important;
+    margin:        0       !important;
+    padding:       0       !important;
+  }
+
+  /* ── 2. Hide all app chrome ───────────────────────────────────────────────
+     Everything disappears; only .phing-print-area punches back through.
+     (Sidebar, NoteList, toolbar, status-bar, TOC panel all vanish.)         */
   body * { visibility: hidden; }
 
   .phing-print-area,
-  .phing-print-area * {
-    visibility: visible;
-  }
+  .phing-print-area * { visibility: visible; }
 
+  /* ── 3. Print area — natural document flow ────────────────────────────────
+     position: absolute (not fixed) so content flows across pages.
+     No padding — @page { margin: 2cm } handles whitespace.                  */
   .phing-print-area {
-    position: fixed;
-    inset: 0;
-    width: 210mm;
-    min-height: 297mm;
-    margin: 0 auto;
-    padding: 24mm 20mm 28mm;
+    position:    absolute;
+    top:         0;
+    left:        0;
+    width:       100%;
+    background:  #ffffff !important;
     font-family: 'Lora', Georgia, serif;
-    font-size: 11pt;
+    font-size:   11pt;
     line-height: 1.75;
-    color: #1a1a1a;
-    background: white;
+    color:       #1a1a1a;
   }
 
-  .phing-print-area h1 { font-size: 22pt; margin-bottom: 4mm; page-break-after: avoid; }
-  .phing-print-area h2 { font-size: 16pt; margin: 8mm 0 3mm; page-break-after: avoid; }
-  .phing-print-area h3 { font-size: 13pt; margin: 6mm 0 2mm; page-break-after: avoid; }
+  /* ── 4. Selective colour preservation ────────────────────────────────────
+     color-adjust: exact is intentionally withheld from body and structural
+     wrappers so the browser strips their app-theme backgrounds.  We opt
+     specific CONTENT elements back in — only those that carry intentional
+     colour that belongs in the printed document.                             */
+
+  /* Tag pills — each carries a distinct per-category pastel fill */
+  .phing-print-area .editor-tag--pill {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust:         exact !important;
+  }
+
+  /* Inline code — de-alpha'd tint so it's visible on a white page */
+  .phing-print-area code {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust:         exact !important;
+    background: #f0eaf7 !important; /* solid equivalent of rgba(203,170,203,0.18) on white */
+    color: #7b5ea7;
+  }
+
+  /* Code blocks */
+  .phing-print-area pre {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust:         exact !important;
+    background: #f9f6fa !important;
+  }
+
+  /* Highlight marks (future feature / ProseMirror mark extension) */
+  mark,
+  [data-highlight] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust:         exact !important;
+  }
+
+  /* Mind-map nodes — branch-tinted fills and borders must survive */
+  .mm-node,
+  .mm-node--root,
+  .mm-node--l1,
+  .mm-node--deep {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust:         exact !important;
+  }
+
+  /* ── 5. Headings — never orphaned at the bottom of a page ────────────────
+     Both legacy (page-break-*) and modern (break-*) forms are required for
+     cross-engine compatibility.                                              */
+  .phing-print-area h1,
+  .phing-print-area h2,
+  .phing-print-area h3,
+  .phing-print-area h4,
+  .phing-print-area h5,
+  .phing-print-area h6 {
+    page-break-after:  avoid;
+    page-break-inside: avoid;
+    break-after:       avoid;
+    break-inside:      avoid;
+  }
+
+  /* ── 6. Atomic content blocks — never sliced across pages ────────────────
+     orphans / widows keep at least 3 lines at page top/bottom.              */
+  .phing-print-area p,
+  .phing-print-area pre,
+  .phing-print-area blockquote,
+  .phing-print-area li,
+  .phing-print-area table,
+  .phing-print-area figure,
+  .phing-print-area .editor-footnotes,
+  .phing-print-area .editor-footnotes__item {
+    page-break-inside: avoid;
+    break-inside:      avoid;
+    orphans:           3;
+    widows:            3;
+  }
+
+  /* ── 7. Typography ────────────────────────────────────────────────────────
+     All colour values here are hardcoded hex — they are text colours, not
+     backgrounds, and do not require color-adjust: exact.                    */
+  .phing-print-area h1 { font-size: 22pt; margin-bottom: 4mm; color: #2a2230; }
+  .phing-print-area h2 {
+    font-size: 16pt; margin: 8mm 0 3mm;
+    border-bottom: 0.75pt solid #cbaacb; padding-bottom: 1.5mm;
+  }
+  .phing-print-area h3 { font-size: 13pt; margin: 6mm 0 2mm; color: #7b5ea7; }
+  .phing-print-area h4 { font-size: 11pt; margin: 5mm 0 2mm; color: #c94f4f; }
+  .phing-print-area h5 { font-size: 10pt; margin: 4mm 0 2mm; color: #9a7aaa; }
   .phing-print-area p  { margin-bottom: 4mm; }
-  .phing-print-area blockquote { border-left: 2pt solid #ccc; padding-left: 6mm; color: #555; }
-  .phing-print-area pre { font-family: monospace; font-size: 9pt; border: 0.5pt solid #ccc; padding: 4mm; }
+
+  .phing-print-area blockquote {
+    border-left:  2pt solid #cbaacb;
+    padding-left: 6mm;
+    color:        #555;
+    font-style:   italic;
+  }
+  .phing-print-area pre {
+    font-family:  'SF Mono', Menlo, 'Courier New', monospace;
+    font-size:    9pt;
+    border:       0.5pt solid #e0d8e0;
+    border-radius: 3pt;
+    padding:      4mm;
+  }
+  .phing-print-area code {
+    font-family:  'SF Mono', Menlo, 'Courier New', monospace;
+    font-size:    0.88em;
+    padding:      1pt 4pt;
+    border-radius: 3pt;
+  }
   .phing-print-area a { color: #333; text-decoration: underline; }
 
-  @page { size: A4; margin: 0; }
+  /* ── 8. Mind Map print — hide live canvas; show pre-rendered snapshot ─────
+     JS calls exportMindMapToPdf which injects a snapshot <img> before print. */
+  .phing-print-map-canvas   { display: none  !important; visibility: hidden  !important; }
+  .phing-print-map-snapshot { display: block !important; visibility: visible !important;
+                               width: 100%; height: auto; max-width: 100%; }
+
+  /* ── Page setup ───────────────────────────────────────────────────────────
+     2 cm margins on all sides — @page handles spacing, not element padding.  */
+  @page { size: A4; margin: 2cm; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2259,4 +2539,120 @@ textarea,
 .conflict-btn--ghost:hover {
   background: var(--primary-s);
   color:      var(--primary);
+}
+
+/* ══════════════════════════════════════════════════════════
+   EMOJI PICKER
+   Trigger button + floating popover with Café & Bakery and
+   Sakura & Spring sections.  Rendered via portal at
+   document.body so it escapes sidebar overflow clipping.
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Trigger button ─────────────────────────────────────── */
+.emoji-trigger {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  border:          none;
+  background:      transparent;
+  cursor:          pointer;
+  border-radius:   5px;
+  font-size:       13px;
+  line-height:     1;
+  padding:         1px 3px;
+  flex-shrink:     0;
+  user-select:     none;
+  transition:
+    background 0.12s,
+    transform  0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.emoji-trigger:hover {
+  background: var(--primary-s);
+  transform:  scale(1.24);
+}
+
+/* Larger variant — used next to the note title in the editor */
+.emoji-trigger--lg {
+  font-size: 22px;
+  padding:   3px 4px;
+  margin-top: 6px; /* optically align with the large serif title */
+}
+
+/* ── Floating popover ────────────────────────────────────── */
+.emoji-popover {
+  position:   fixed;
+  z-index:    9500;
+  width:      222px;
+  background: var(--card);
+  border:     0.5px solid var(--border);
+  border-radius: 18px;
+  padding:    14px 12px 12px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.52) inset,
+    0 16px 48px rgba(0, 0, 0, 0.11),
+    0 2px 12px var(--primary-g);
+  backdrop-filter: blur(28px) saturate(1.45);
+  -webkit-backdrop-filter: blur(28px) saturate(1.45);
+}
+
+.dark .emoji-popover {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 16px 48px rgba(0, 0, 0, 0.38),
+    0 2px 12px var(--primary-g);
+}
+
+/* ── Section header ─────────────────────────────────────── */
+.emoji-section {
+  margin-bottom: 10px;
+}
+.emoji-section:last-child { margin-bottom: 0; }
+
+.emoji-section--sep {
+  padding-top: 10px;
+  border-top:  0.5px solid var(--divider);
+}
+
+.emoji-section__label {
+  font-family:    var(--font-ui);
+  font-size:      8px;
+  font-weight:    700;
+  color:          var(--muted);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom:  7px;
+}
+
+/* ── Emoji grid — 5 columns ─────────────────────────────── */
+.emoji-grid {
+  display:               grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap:                   3px;
+}
+
+.emoji-item {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  border:          none;
+  background:      transparent;
+  cursor:          pointer;
+  border-radius:   8px;
+  font-size:       19px;
+  line-height:     1;
+  padding:         5px 2px;
+  user-select:     none;
+  transition:
+    background 0.10s,
+    transform  0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.emoji-item:hover {
+  background: var(--primary-s);
+  transform:  scale(1.30);
+}
+
+.emoji-item--active {
+  background: var(--primary-g);
 }

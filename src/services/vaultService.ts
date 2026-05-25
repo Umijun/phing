@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { decodeNote, encodeNote } from '../lib/frontmatter';
 import { captureSnapshot } from '../lib/recoveryJournal';
+import { fromRaw, type FileNode } from '../lib/fileTree';
 import type { Note } from '../store/noteStore';
 
 // Normalise all backslashes to forward slashes before joining so that vault
@@ -188,7 +189,10 @@ export async function atomicWriteNote(
 ): Promise<string> {
   const rel = noteRelativePath(note);
   const abs = absoluteNotePath(vaultPath, note);
-  const tmp = `${abs}.tmp`;
+  // Use a per-call unique suffix so concurrent writes (e.g. 10 rapid "+ New Note"
+  // clicks all landing on "Untitled.md") never overwrite each other's temp file
+  // before the rename step, which would silently corrupt one note's content.
+  const tmp = `${abs}.${crypto.randomUUID().slice(0, 8)}.tmp`;
   const parent = abs.split('/').slice(0, -1).join('/');
 
   if (parent && !(await exists(parent))) {
@@ -241,6 +245,33 @@ export async function readNote(vaultPath: string, relPath: string): Promise<Note
   } catch {
     return null;
   }
+}
+
+// ─── Vault tree ───────────────────────────────────────────────────────────────
+
+/**
+ * Call the Rust `scan_vault_tree` command and convert the raw camelCase
+ * response into a typed `FileNode` tree.
+ */
+export async function scanVaultTree(vaultPath: string): Promise<FileNode> {
+  const raw = await invoke<unknown>('scan_vault_tree', { vaultPath });
+  return fromRaw(raw);
+}
+
+/**
+ * Rename or move a file-system item (file or directory) via the Rust
+ * `rename_path` command.  The Tauri `fs` plugin's `rename` only covers files;
+ * this wraps the Rust `std::fs::rename` which handles directories too.
+ */
+export async function renameFsPath(from: string, to: string): Promise<void> {
+  await invoke<void>('rename_path', { from, to });
+}
+
+/**
+ * Create a directory (and any missing ancestors) using the Tauri fs plugin.
+ */
+export async function createDirectory(path: string): Promise<void> {
+  await mkdir(path, { recursive: true });
 }
 
 /**

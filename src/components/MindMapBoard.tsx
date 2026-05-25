@@ -29,8 +29,13 @@ import '@xyflow/react/dist/style.css';
 import { useMindMapStore, type MindMapDoc } from '../store/mindMapStore';
 import { useNoteStore, type Pocket } from '../store/noteStore';
 import { calculateLayout, saveMindMapToFile, findNode, type LayoutNode } from '../lib/mindmap';
+import { exportMindMapToPdf } from '../lib/pdfExport';
 import { MindMapNode, type MindMapNodeData } from './MindMapNode';
 import { MindMapNotePane } from './MindMapNotePane';
+import { ghostX, ghostY, useNoteDrag } from '../lib/noteDrag';
+import { useVaultStore } from '../store/vaultStore';
+import { relPath } from '../lib/fileTree';
+import { pocketGlow, POCKET_COLORS } from '../lib/pockets';
 
 // ─── Custom bezier edge ──────────────────────────────────────────────────────
 
@@ -78,14 +83,22 @@ const closestNodeByY = (candidates: LayoutNode[], targetY: number): LayoutNode |
 
 // ─── Mind Map list sidebar ────────────────────────────────────────────────────
 
+// Stable framer-motion variants so references don't change on every render.
+const BOARD_CARD_VARIANTS = {
+  idle:     { scale: 1,    opacity: 1,    transition: { type: 'spring' as const, stiffness: 500, damping: 32 } },
+  dragging: { scale: 0.96, opacity: 0.45, transition: { type: 'spring' as const, stiffness: 500, damping: 32 } },
+};
+
 interface MindMapListProps {
-  mindMaps:         MindMapDoc[];
-  selectedId:       string | null;
-  pocketFilter:     string;
-  onSelect:         (id: string) => void;
-  onCreate:         () => void;
-  onDelete:         (id: string) => void;
-  onRename:         (id: string, title: string) => void;
+  mindMaps:     MindMapDoc[];
+  selectedId:   string | null;
+  pocketFilter: string;
+  onSelect:     (id: string) => void;
+  onCreate:     () => void;
+  onDelete:     (id: string) => void;
+  onRename:     (id: string, title: string) => void;
+  /** Called when the user drags a board card and drops it on a pocket. */
+  onMove:       (boardId: string, pocketId: string) => void;
 }
 
 const MindMapList = ({
@@ -96,11 +109,90 @@ const MindMapList = ({
   onCreate,
   onDelete,
   onRename,
+  onMove,
 }: MindMapListProps) => {
-  const [editingId,  setEditingId]  = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState('');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [editingId,       setEditingId]       = useState<string | null>(null);
+  const [draftTitle,      setDraftTitle]       = useState('');
+  const [deletingId,      setDeletingId]       = useState<string | null>(null);
+  const [draggingBoardId, setDraggingBoardId] = useState<string | null>(null);
+  const inputRef       = useRef<HTMLInputElement>(null);
+  const isListeningRef = useRef(false);
+
+  // ── Pointer-drag handler (note-style, same threshold + ghost mechanism) ──
+  const handleBoardPointerDown = useCallback((
+    e: React.PointerEvent<HTMLDivElement>,
+    doc: MindMapDoc,
+  ) => {
+    // Ignore action buttons (rename ✎, delete ✕)
+    if ((e.target as Element).closest('.mm-list-action')) return;
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    if (isListeningRef.current) return;
+
+    e.preventDefault();
+    isListeningRef.current = true;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+
+    ghostX.set(startX);
+    ghostY.set(startY);
+
+    const { setDragging, setHoveredPocket } = useNoteDrag.getState();
+
+    const onPointerMove = (ev: PointerEvent) => {
+      ghostX.set(ev.clientX);
+      ghostY.set(ev.clientY);
+
+      if (!dragging) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
+        dragging = true;
+        setDraggingBoardId(doc.id);
+        setDragging({ kind: 'board', boardId: doc.id, title: doc.title, folder: doc.folder });
+      }
+
+      // The ghost itself has pointer-events:none so elementsFromPoint sees through it.
+      const els      = document.elementsFromPoint(ev.clientX, ev.clientY);
+      const pocketEl = els.find((el) => el.hasAttribute('data-pocket-id'));
+      setHoveredPocket(pocketEl ? pocketEl.getAttribute('data-pocket-id') : null);
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('pointermove',   onPointerMove);
+      window.removeEventListener('pointerup',     onPointerUp);
+      window.removeEventListener('pointercancel', onPointerCancel);
+      isListeningRef.current = false;
+    };
+
+    const onPointerUp = () => {
+      cleanup();
+      if (dragging) {
+        setDraggingBoardId(null);
+        const { hoveredPocketId } = useNoteDrag.getState();
+        if (hoveredPocketId !== null && doc.folder !== hoveredPocketId) {
+          onMove(doc.id, hoveredPocketId);
+        }
+        setDragging(null);
+        setHoveredPocket(null);
+      } else {
+        // Threshold never crossed → treat as a tap / click
+        onSelect(doc.id);
+      }
+    };
+
+    const onPointerCancel = () => {
+      cleanup();
+      if (dragging) {
+        setDraggingBoardId(null);
+        setDragging(null);
+        setHoveredPocket(null);
+      }
+    };
+
+    window.addEventListener('pointermove',   onPointerMove);
+    window.addEventListener('pointerup',     onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
+  }, [onMove, onSelect]);
 
   const filtered = pocketFilter === '*'
     ? mindMaps
@@ -195,20 +287,28 @@ const MindMapList = ({
               style={{ overflow: 'hidden' }}
             >
               <motion.div
-                whileHover={{ background: 'var(--primary-s)' }}
-                onClick={() => onSelect(doc.id)}
+                // Pointer-drag: onPointerDown handles both tap (click) and drag.
+                // onClick is intentionally absent — selection fires in onPointerUp
+                // when the movement threshold was NOT crossed.
+                onPointerDown={(e) => handleBoardPointerDown(e, doc)}
+                whileHover={draggingBoardId ? {} : { background: 'var(--primary-s)' }}
+                variants={BOARD_CARD_VARIANTS}
+                animate={draggingBoardId === doc.id ? 'dragging' : 'idle'}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '7px 10px',
+                  display:      'flex',
+                  alignItems:   'center',
+                  gap:          8,
+                  padding:      '7px 10px',
                   borderRadius: 10,
-                  cursor: 'pointer',
+                  cursor:       draggingBoardId ? 'grabbing' : 'grab',
                   marginBottom: 2,
-                  background: doc.id === selectedId ? 'var(--primary-s)' : 'transparent',
-                  borderLeft: doc.id === selectedId ? '2px solid var(--primary)' : '2px solid transparent',
-                  transition: 'background 0.15s',
-                  position: 'relative',
+                  background:   doc.id === selectedId ? 'var(--primary-s)' : 'transparent',
+                  borderLeft:   doc.id === selectedId ? '2px solid var(--primary)' : '2px solid transparent',
+                  transition:   'background 0.15s',
+                  position:     'relative',
+                  touchAction:  'none',
+                  userSelect:   draggingBoardId ? 'none' : undefined,
+                  willChange:   'transform',
                 }}
                 className="mm-list-item"
               >
@@ -306,140 +406,110 @@ const MindMapList = ({
   );
 };
 
-// ─── Pocket filter dropdown ───────────────────────────────────────────────────
+// ─── Board pocket sidebar ─────────────────────────────────────────────────────
+//
+// Always-visible inline list of pockets in the board's left panel.
+//
+// Two bugs this solves:
+//
+// 1. Board drag-and-drop: The old click-to-open dropdown was invisible while
+//    the user held the pointer button during a drag, so document.elementsFromPoint
+//    never found a data-pocket-id element and every drop silently failed.
+//    Each item here carries data-pocket-id at all times so handleBoardPointerDown
+//    can detect the hovered pocket the moment the pointer moves over it.
+//
+// 2. Ghost pockets: The component derives its list from `pockets` (already
+//    computed as livePockets in BoardInner from the live vaultTree), so folder
+//    renames and deletions are reflected immediately without any separate
+//    s.pockets synchronisation step.
 
-interface PocketFilterProps {
-  pockets: Pocket[];
-  active:  string;
-  onChange:(id: string) => void;
+interface BoardPocketSidebarProps {
+  pockets:  Pocket[];
+  active:   string;
+  onChange: (id: string) => void;
 }
 
-const PocketFilterDropdown = ({ pockets, active, onChange }: PocketFilterProps) => {
-  const [open, setOpen] = useState(false);
-  const containerRef    = useRef<HTMLDivElement>(null);
+const BoardPocketSidebar = ({ pockets, active, onChange }: BoardPocketSidebarProps) => {
+  const dragging        = useNoteDrag((s) => s.dragging);
+  const hoveredPocketId = useNoteDrag((s) => s.hoveredPocketId);
+  const isDraggingBoard = dragging?.kind === 'board';
 
-  // Close when the user clicks anywhere outside the dropdown
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as HTMLElement)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const activeLabel = (() => {
-    if (active === '*') return '≡ All';
-    if (active === '') return '◯ Root';
-    const p = pockets.find((pk) => pk.id === active);
-    return p ? `${p.emoji ?? ''} ${p.name}`.trim() : '≡ All';
-  })();
-
-  const options = [
-    { id: '*', label: '≡ All',  color: undefined },
-    { id: '',  label: '◯ Root', color: undefined },
-    ...pockets.map((p) => ({ id: p.id, label: `${p.emoji ?? ''} ${p.name}`.trim(), color: p.color })),
+  const options: Array<{ id: string; label: string; color?: string }> = [
+    { id: '*', label: '≡ All' },
+    ...pockets.map((p) => ({
+      id:    p.id,
+      label: [p.emoji, p.name].filter(Boolean).join(' '),
+      color: p.color,
+    })),
   ];
 
   return (
     <div
-      ref={containerRef}
-      style={{ padding: '6px 10px', borderBottom: '0.5px solid var(--divider)', flexShrink: 0, position: 'relative' }}
+      style={{
+        padding:      '4px 6px 6px',
+        borderBottom: '0.5px solid var(--divider)',
+        flexShrink:   0,
+        maxHeight:    160,
+        overflowY:    'auto',
+      }}
     >
-      {/* Trigger — shows the active filter label */}
-      <motion.button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        whileHover={{ background: 'var(--primary-s)' }}
-        style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          width:          '100%',
-          border:         '0.5px solid var(--border)',
-          background:     open ? 'var(--primary-s)' : 'var(--card)',
-          color:          open ? 'var(--primary)' : 'var(--muted)',
-          borderRadius:   8,
-          padding:        '5px 10px',
-          fontSize:       10,
-          fontWeight:     600,
-          cursor:         'pointer',
-          fontFamily:     'var(--font-ui)',
-          letterSpacing:  '0.2px',
-          transition:     'background 0.15s, color 0.15s',
-        }}
-      >
-        <span>{activeLabel}</span>
-        <motion.span
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-          style={{ opacity: 0.55, fontSize: 8, display: 'flex', alignItems: 'center' }}
-        >
-          ▾
-        </motion.span>
-      </motion.button>
-
-      {/* Frosted-glass dropdown — GPU-accelerated via transform + opacity */}
-      <AnimatePresence>
-        {open && (
+      {options.map((opt) => {
+        const isActive  = active === opt.id;
+        const isHovered = isDraggingBoard && hoveredPocketId === opt.id;
+        return (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -6 }}
-            animate={{ opacity: 1, scale: 1,    y: 0  }}
-            exit={{    opacity: 0, scale: 0.95, y: -6 }}
-            transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
+            key={opt.id}
+            // ── data-pocket-id is the drop-target hook ──────────────────────
+            // handleBoardPointerDown reads this via document.elementsFromPoint
+            // on every pointermove so it knows which pocket the card is over.
+            data-pocket-id={opt.id}
+            onClick={() => onChange(opt.id)}
+            whileHover={isDraggingBoard ? {} : { background: 'var(--primary-s)', color: 'var(--primary)' }}
+            animate={isHovered ? { background: 'var(--primary-s)', color: 'var(--primary)' } : {}}
             style={{
-              position:             'absolute',
-              top:                  'calc(100% + 4px)',
-              left:                 10,
-              right:                10,
-              zIndex:               50,
-              background:           'var(--card)',
-              backdropFilter:       'blur(24px)',
-              WebkitBackdropFilter: 'blur(24px)',
-              border:               '0.5px solid var(--border)',
-              borderRadius:         12,
-              boxShadow:            '0 8px 28px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06)',
-              padding:              '4px',
-              transformOrigin:      'top center',
+              display:      'flex',
+              alignItems:   'center',
+              gap:          6,
+              padding:      '4px 8px',
+              borderRadius: 8,
+              borderLeft:   `2px solid ${isActive || isHovered ? 'var(--primary)' : 'transparent'}`,
+              cursor:       'pointer',
+              fontSize:     10,
+              fontWeight:   isActive ? 700 : 400,
+              color:        isActive ? 'var(--primary)' : 'var(--muted)',
+              background:   isActive ? 'var(--primary-g)' : 'transparent',
+              marginBottom: 1,
+              transition:   'background 0.1s, color 0.1s',
+              userSelect:   'none',
             }}
           >
-            {options.map((opt) => (
-              <motion.button
-                key={opt.id}
-                type="button"
-                whileHover={{ background: 'var(--primary-s)', color: 'var(--primary)' }}
-                onClick={() => { onChange(opt.id); setOpen(false); }}
+            {opt.color && (
+              <motion.span
+                animate={isHovered
+                  ? {
+                      scale: [1, 1.5, 1],
+                      transition: { repeat: Infinity, duration: 0.85, ease: 'easeInOut' as const },
+                    }
+                  : { scale: 1, transition: { type: 'spring' as const, stiffness: 400, damping: 20 } }}
                 style={{
-                  display:      'flex',
-                  alignItems:   'center',
-                  gap:          6,
-                  width:        '100%',
-                  border:       'none',
-                  background:   active === opt.id ? 'var(--primary-g)' : 'transparent',
-                  color:        active === opt.id ? 'var(--primary)' : 'var(--muted)',
-                  borderRadius: 8,
-                  padding:      '5px 8px',
-                  fontSize:     10,
-                  fontWeight:   active === opt.id ? 700 : 400,
-                  cursor:       'pointer',
-                  fontFamily:   'var(--font-ui)',
-                  textAlign:    'left',
+                  display:      'inline-block',
+                  width:        5,
+                  height:       5,
+                  borderRadius: '50%',
+                  background:   opt.color,
+                  flexShrink:   0,
+                  boxShadow:    isHovered
+                    ? `0 0 8px ${pocketGlow(opt.color, 0.73)}`
+                    : `0 0 4px ${pocketGlow(opt.color, 0.3)}`,
                 }}
-              >
-                {opt.color && (
-                  <span style={{
-                    display: 'inline-block', width: 5, height: 5,
-                    borderRadius: '50%', background: opt.color, flexShrink: 0,
-                  }} />
-                )}
-                {opt.label}
-              </motion.button>
-            ))}
+              />
+            )}
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {opt.label}
+            </span>
           </motion.div>
-        )}
-      </AnimatePresence>
+        );
+      })}
     </div>
   );
 };
@@ -467,13 +537,21 @@ const BoardInner = () => {
   const createMindMap    = useMindMapStore((s) => s.createMindMap);
   const deleteMindMap    = useMindMapStore((s) => s.deleteMindMap);
   const renameMindMap    = useMindMapStore((s) => s.renameMindMap);
+  const moveMindMap      = useMindMapStore((s) => s.moveMindMap);
 
-  const pockets = useNoteStore((s) => s.pockets);
-  const isDark  = useNoteStore((s) => s.isDark);
+  const pockets   = useNoteStore((s) => s.pockets);
+  // vaultTree is the live filesystem state — changes on every folder op.
+  // Reading it here (not inside a memo) ensures BoardInner re-renders when
+  // folders are created, renamed, or deleted, which in turn recomputes livePockets.
+  const vaultTree = useNoteStore((s) => s.vaultTree);
+  const vaultPath = useVaultStore((s) => s.vaultPath) ?? '';
+  const isDark    = useNoteStore((s) => s.isDark);
   const isSidebarOpen = useNoteStore((s) => s.isSidebarOpen);
   const { fitView, setCenter, getZoom } = useReactFlow();
 
   const boardRef            = useRef<HTMLDivElement>(null);
+  // Ref attached to .mm-canvas-wrap — used by the mind-map PDF snapshot.
+  const canvasWrapRef       = useRef<HTMLDivElement>(null);
   const prevEditingRef      = useRef<string | null>(null);
   const prevNotePopupRef    = useRef<string | null>(null);
   const prevPanelStateRef   = useRef<{ notePopupId: string | null; isSidebarOpen: boolean } | null>(null);
@@ -481,7 +559,27 @@ const BoardInner = () => {
   // Enter key does not immediately trigger "add sibling" on the board.
   const editJustCommittedRef = useRef(false);
 
-  const [pocketFilter, setPocketFilter] = useState<string>('*');
+  const [pocketFilter,    setPocketFilter]    = useState<string>('*');
+  const [isPdfExporting,  setIsPdfExporting]  = useState(false);
+
+  // ── Live pocket list ──────────────────────────────────────────────────────────
+  // When a vault is open, derive the pocket list directly from vaultTree so that
+  // folder renames and deletions appear immediately — no s.pockets sync needed.
+  // vaultTree is a reactive Zustand selector, so this memo re-runs whenever any
+  // folder operation patches the tree.  Falls back to s.pockets (localStorage)
+  // in sample-data / first-run mode when no vault is open.
+  const livePockets = useMemo((): Pocket[] => {
+    if (!vaultTree || !vaultPath) return pockets;
+    return vaultTree.children
+      .filter((n) => n.isDir)
+      .map((n, i) => {
+        const id       = relPath(vaultPath, n.path);
+        const existing = pockets.find((p) => p.id === id);
+        // Preserve saved colour / emoji if this pocket was already known;
+        // otherwise assign a fresh palette colour from the round-robin set.
+        return existing ?? { id, name: n.name, color: POCKET_COLORS[i % POCKET_COLORS.length] };
+      });
+  }, [vaultTree, vaultPath, pockets]);
 
   // ── Focus helper ─────────────────────────────────────────────────────────────
   const focusBoard = useCallback(() => {
@@ -489,6 +587,7 @@ const BoardInner = () => {
       requestAnimationFrame(() => boardRef.current?.focus({ preventScroll: true }))
     );
   }, []);
+
 
   // ── Convert tree → React Flow nodes & edges ───────────────────────────────
   const layout = useMemo(() => calculateLayout(tree), [tree]);
@@ -726,6 +825,29 @@ const BoardInner = () => {
   // ── Active map title for toolbar ──────────────────────────────────────────
   const activeMapTitle = mindMaps.find((d) => d.id === selectedMapId)?.title ?? 'Mind Map';
 
+  // ── Mind-map PDF export ────────────────────────────────────────────────────
+  // Strategy:
+  //   1. fitView({ duration: 0 }) ensures all nodes are visible in the viewport.
+  //   2. Two rAF ticks let React Flow commit the new CSS transform to the DOM
+  //      before html2canvas reads it.
+  //   3. exportMindMapToPdf captures .mm-canvas-wrap → landscape A4.
+  const handleMindMapPdfExport = useCallback(async () => {
+    if (isPdfExporting || !canvasWrapRef.current) return;
+    setIsPdfExporting(true);
+    try {
+      fitView({ padding: 0.12, duration: 0 });
+      // Two rAF ticks: one to commit the React Flow state update, one to paint.
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      await exportMindMapToPdf(canvasWrapRef.current, activeMapTitle);
+    } catch (err) {
+      console.error('[phing] Mind map PDF export failed', err);
+    } finally {
+      setIsPdfExporting(false);
+    }
+  }, [isPdfExporting, fitView, activeMapTitle]);
+
   return (
     <div
       className={`mm-board${isDark ? ' dark' : ''}`}
@@ -746,8 +868,8 @@ const BoardInner = () => {
           overflow: 'hidden',
         }}
       >
-        <PocketFilterDropdown
-          pockets={pockets}
+        <BoardPocketSidebar
+          pockets={livePockets}
           active={pocketFilter}
           onChange={setPocketFilter}
         />
@@ -761,6 +883,7 @@ const BoardInner = () => {
             onCreate={() => { void createMindMap(pocketFilter === '*' ? '' : pocketFilter); focusBoard(); }}
             onDelete={(id) => void deleteMindMap(id)}
             onRename={(id, title) => renameMindMap(id, title)}
+            onMove={(id, pocketId) => moveMindMap(id, pocketId)}
           />
         </div>
       </div>
@@ -795,6 +918,13 @@ const BoardInner = () => {
             <div className="mm-toolbar__sep" />
             <MmBtn onClick={() => { resetBoard(); focusBoard(); }} title="Clear board">↺ reset</MmBtn>
             <MmBtn onClick={() => void saveMindMapToFile(tree)} title="Export Markdown" primary>↓ export</MmBtn>
+            <MmBtn
+              onClick={() => void handleMindMapPdfExport()}
+              title="Export as PDF (landscape A4)"
+              primary={isPdfExporting}
+            >
+              {isPdfExporting ? '⏳ pdf…' : '↓ pdf'}
+            </MmBtn>
           </div>
         </div>
 
@@ -810,7 +940,7 @@ const BoardInner = () => {
 
         {/* Canvas row */}
         <div className="mm-canvas-row">
-          <div className="mm-canvas-wrap">
+          <div ref={canvasWrapRef} className="mm-canvas-wrap">
             <ReactFlow
               nodes={nodes}
               edges={edges}

@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useRef, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNoteStore, Note, Pocket } from '../store/noteStore';
 import { stripMarkdown } from '../lib/stripMarkdown';
@@ -23,7 +23,15 @@ const NoteList = () => {
   const createNote     = useNoteStore((s) => s.createNote);
 
   const filtered = useMemo(
-    () => notes.filter((n: Note) => activePocket === '' || n.folder === activePocket),
+    () =>
+      notes.filter((n: Note) =>
+        // '' = All Notes (no filter)
+        // exact match = notes directly in this folder
+        // prefix match = notes in any sub-folder of this folder
+        activePocket === '' ||
+        n.folder === activePocket ||
+        n.folder.startsWith(activePocket + '/'),
+      ),
     [notes, activePocket],
   );
   const pocket = useMemo(
@@ -126,10 +134,36 @@ const NoteCard = memo(({
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDragging,    setIsDragging]    = useState(false);
+  const confirmDeleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cancel the confirm-delete auto-reset timer on unmount so it can't call
+  // setConfirmDelete on an already-unmounted component (e.g. when the note
+  // is deleted by deleteTreeFolder while the double-click guard is pending).
+  useEffect(() => () => {
+    if (confirmDeleteTimer.current !== null) clearTimeout(confirmDeleteTimer.current);
+  }, []);
 
   // Guard against rapid successive pointerdowns registering duplicate window
   // listeners.  Cleared in the pointerup / pointercancel cleanup path.
   const isListeningRef = useRef(false);
+
+  // Holds a reference to the active drag's cleanup function so that if this
+  // NoteCard unmounts while a drag is in progress (e.g. the user switches to
+  // the Board view mid-drag), the three window listeners are removed and the
+  // shared drag state in useNoteDrag is reset.  Without this, the listeners
+  // would accumulate on window for the lifetime of the page and the drag ghost
+  // / pocket-highlight would remain visible indefinitely.
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => {
+    dragCleanupRef.current?.();
+    // Reset shared Zustand drag state unconditionally — covers the case where
+    // the cleanup fires while a drag is active (setDragging is a store action,
+    // not a React setState, so calling it after unmount is safe).
+    const { setDragging, setHoveredPocket } = useNoteDrag.getState();
+    setDragging(null);
+    setHoveredPocket(null);
+  }, []);
 
   const snip = useMemo(() => stripMarkdown(note.content), [note.content]);
   const ago  = useMemo(() => formatNoteDate(note.updatedAt),  [note.updatedAt]);
@@ -182,7 +216,7 @@ const NoteCard = memo(({
         // Threshold crossed — activate drag.
         dragging = true;
         setIsDragging(true);
-        setDragging({ noteId: note.id, title: note.title, emoji: note.emoji, folder: note.folder });
+        setDragging({ kind: 'note', noteId: note.id, title: note.title, emoji: note.emoji, folder: note.folder });
       }
 
       // Identify the pocket element under the cursor.
@@ -197,8 +231,13 @@ const NoteCard = memo(({
       window.removeEventListener('pointermove',   onMove);
       window.removeEventListener('pointerup',     onUp);
       window.removeEventListener('pointercancel', onCancel);
-      isListeningRef.current = false;
+      isListeningRef.current  = false;
+      dragCleanupRef.current  = null; // prevent double-call from the unmount effect
     };
+
+    // Store the cleanup fn so the unmount useEffect can call it if the
+    // component is removed before pointerup / pointercancel fires.
+    dragCleanupRef.current = cleanup;
 
     const onUp = () => {
       cleanup();
@@ -245,21 +284,45 @@ const NoteCard = memo(({
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirmDelete) {
+      if (confirmDeleteTimer.current !== null) {
+        clearTimeout(confirmDeleteTimer.current);
+        confirmDeleteTimer.current = null;
+      }
       void deleteNote(note.id);
       setConfirmDelete(false);
     } else {
       setConfirmDelete(true);
-      setTimeout(() => setConfirmDelete(false), 3000);
+      confirmDeleteTimer.current = setTimeout(() => {
+        confirmDeleteTimer.current = null;
+        setConfirmDelete(false);
+      }, 3000);
     }
   };
 
   return (
     <motion.div
-      // ── Exit: shrink the card out of the list on move / delete ────────────
+      // ── Exit: card "sinks" toward the sidebar then the slot collapses ─────
+      // Phase 1 (0 → 200 ms): fade + shrink + slide left into the pocket.
+      // Phase 2 (100 → 340 ms): height/padding collapse to close the gap.
+      // The 100 ms overlap makes the height implosion feel responsive while
+      // the opacity/scale still have time to finish gracefully.
       exit={{
-        opacity: 0, scale: 0.94, height: 0,
-        marginBottom: 0, paddingTop: 0, paddingBottom: 0,
-        transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] },
+        opacity:       0,
+        scale:         0.88,
+        x:             -20,
+        height:        0,
+        marginBottom:  0,
+        paddingTop:    0,
+        paddingBottom: 0,
+        transition: {
+          opacity:       { duration: 0.20, ease: 'easeOut'       as const },
+          scale:         { duration: 0.20, ease: 'easeOut'       as const },
+          x:             { duration: 0.20, ease: 'easeOut'       as const },
+          height:        { duration: 0.24, delay: 0.10, ease: [0.4, 0, 0.2, 1] },
+          marginBottom:  { duration: 0.24, delay: 0.10 },
+          paddingTop:    { duration: 0.24, delay: 0.10 },
+          paddingBottom: { duration: 0.24, delay: 0.10 },
+        },
       }}
       // ── Drag-ghost source: card fades + shrinks so the ghost feels "lifted" ─
       variants={NOTE_CARD_VARIANTS}

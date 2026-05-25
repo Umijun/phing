@@ -16,6 +16,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import EmojiPicker from './EmojiPicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNoteStore, Pocket } from '../store/noteStore';
 import { useVaultStore } from '../store/vaultStore';
@@ -23,7 +24,9 @@ import { truncatePath, defaultVaultPath } from '../lib/vaultPaths';
 import { readAvatarFromFile } from '../lib/profileAvatar';
 import { isTauri } from '../lib/tauri';
 import { useNoteDrag } from '../lib/noteDrag';
+import { FileTree } from './FileTree';
 import * as vaultService from '../services/vaultService';
+import { pocketGlow } from '../lib/pockets';
 import { mkdir, exists } from '@tauri-apps/plugin-fs';
 import type { AppView } from '../App';
 
@@ -54,6 +57,9 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
     loadVault,
     createFolder,
     deleteFolder,
+    vaultTree,
+    createSubFolder,
+    setPocketEmoji,
   } = useNoteStore();
   const { vaultPath, setVaultPath } = useVaultStore();
 
@@ -71,6 +77,12 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
   const nameRef        = useRef<HTMLDivElement>(null);
   const subtitleRef    = useRef<HTMLDivElement>(null);
   const pocketInputRef = useRef<HTMLInputElement>(null);
+  // Guards against the onBlur double-fire that occurs when pressing Enter:
+  // setNewPocketOpen(false) unmounts the input, which fires onBlur synchronously
+  // before React can re-render, so submitNewPocket would run twice with the
+  // same captured newPocketName.  Mirrors the commitFiredRef pattern in
+  // FileTree's FolderNode.
+  const submitFiredRef = useRef(false);
 
   const initial = profile.name.trim().charAt(0).toUpperCase() || 'S';
 
@@ -84,7 +96,10 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
   }, [profile.name, profile.subtitle]);
 
   useEffect(() => {
-    if (newPocketOpen) setTimeout(() => pocketInputRef.current?.focus(), 80);
+    if (newPocketOpen) {
+      submitFiredRef.current = false; // reset guard each time the input opens
+      setTimeout(() => pocketInputRef.current?.focus(), 80);
+    }
   }, [newPocketOpen]);
 
   const onFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,9 +113,21 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
   const onNameBlur     = () => updateProfile({ name:     nameRef.current?.innerText.trim()     || 'Scholar' });
   const onSubtitleBlur = () => updateProfile({ subtitle: subtitleRef.current?.innerText.trim() || '' });
 
-  const submitNewPocket = () => {
+  const submitNewPocket = async () => {
+    if (submitFiredRef.current) return; // suppress the onBlur double-fire on Enter
+    submitFiredRef.current = true;
     const name = newPocketName.trim();
-    if (name) createFolder(name);
+    if (name) {
+      if (vaultPath && vaultTree) {
+        // Vault is open — create an actual directory at the vault root so the
+        // folder appears in the file tree immediately.  createSubFolder also
+        // patches vaultTree and sets activePocket.
+        await createSubFolder(vaultPath, name);
+      } else {
+        // No vault (sample-data / first-run) — create an in-memory pocket only.
+        createFolder(name);
+      }
+    }
     setNewPocketName('');
     setNewPocketOpen(false);
   };
@@ -225,136 +252,45 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
             onClick={() => onViewChange?.('board')}
           />
 
-          {/* Pockets list */}
+          {/* ── Files section ────────────────────────────────────────── */}
           <div style={{ height: 14 }} />
-          <SectionLabel label={t.pockets} />
-
-          <AnimatePresence initial={false}>
-            {pockets.map((p: Pocket) => {
-              const isActive     = activePocket === p.id;
-              const isDeleting   = confirmDeletePocket === p.id;
-              const isDropTarget = isDraggingAny && hoveredPocketId === p.id;
-
-              return (
-                <motion.div
-                  key={p.id}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-                  style={{ overflow: 'hidden' }}
-                >
-                  {/* Spring-scale wrapper — pocket breathes when hovered during drag */}
-                  <motion.div
-                    animate={{ scale: isDropTarget ? 1.025 : 1 }}
-                    transition={{ type: 'spring', stiffness: 600, damping: 35 }}
-                    style={{ transformOrigin: 'left center' }}
-                  >
-                    <motion.div
-                      // ── data-pocket-id is read by NoteCard's elementsFromPoint ──
-                      data-pocket-id={p.id}
-                      whileHover={{
-                        background: isActive ? 'var(--primary-g)' : 'var(--primary-s)',
-                        color:      'var(--primary)',
-                      }}
-                      onClick={() => setActivePocket(p.id)}
-                      className={`sidebar-pocket-item${isDropTarget ? ' sidebar-pocket-item--droptarget' : ''}`}
-                      style={{
-                        display:      'flex',
-                        alignItems:   'center',
-                        gap:           8,
-                        // 2px left border always reserved so content never shifts.
-                        borderLeft:   `2px solid ${isDropTarget || isActive ? 'var(--primary)' : 'transparent'}`,
-                        padding:      '6px 10px 6px 8px',
-                        borderRadius: '0 var(--r-sm) var(--r-sm) 0',
-                        cursor:       'pointer',
-                        fontSize:      11,
-                        marginBottom:  2,
-                        color:         isDropTarget || isActive ? 'var(--primary)' : 'var(--muted)',
-                        background:    isDropTarget ? 'var(--primary-s)' : isActive ? 'var(--primary-g)' : 'transparent',
-                        fontWeight:    isActive ? 600 : 400,
-                        position:     'relative',
-                        overflow:     'hidden',
-                        transition:   'background 0.12s, color 0.12s, border-color 0.12s',
-                      }}
-                    >
-                      {/* Colour dot — pulses when this pocket is the live drop target */}
-                      <motion.div
-                        animate={isDropTarget
-                          ? { scale: [1, 1.55, 1],
-                              transition: { repeat: Infinity, duration: 0.85, ease: 'easeInOut' } }
-                          : { scale: 1,
-                              transition: { type: 'spring', stiffness: 400, damping: 20 } }
-                        }
-                        style={{
-                          width:        7,
-                          height:       7,
-                          borderRadius: '50%',
-                          background:   p.color,
-                          boxShadow:    isDropTarget ? `0 0 10px ${p.color}cc` : `0 0 6px ${p.color}80`,
-                          flexShrink:   0,
-                        }}
-                      />
-                      {/* Pocket name — truncates with ellipsis on narrow sidebar */}
-                      <span
-                        style={{
-                          flex:         1,
-                          overflow:     'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace:   'nowrap',
-                        }}
-                      >
-                        {p.emoji} {p.name}
-                      </span>
-                      {/* Delete button — revealed on hover via CSS */}
-                      <button
-                        type="button"
-                        className="sidebar-pocket-delete"
-                        onClick={(e) => onDeletePocket(p.id, e)}
-                        title={isDeleting ? 'Click again to delete' : 'Delete pocket'}
-                        style={{
-                          opacity:      isDeleting ? 1 : undefined,
-                          color:        isDeleting ? '#FF5252' : undefined,
-                          background:   isDeleting ? 'rgba(255,82,82,0.1)' : undefined,
-                          fontSize:     9,
-                          fontWeight:   700,
-                          padding:      '2px 5px',
-                          borderRadius: 5,
-                        }}
-                      >
-                        {isDeleting ? 'del?' : '✕'}
-                      </button>
-                    </motion.div>
-                  </motion.div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-
-          {/* + New Pocket trigger */}
-          <motion.div
-            whileHover={{ color: 'var(--primary)', background: 'var(--primary-s)' }}
-            transition={springHover}
-            onClick={() => setNewPocketOpen(true)}
+          <div
             style={{
-              padding:      '5px 10px',
-              fontSize:     10,
-              color:        'var(--soft)',
-              cursor:       'pointer',
-              borderRadius: 'var(--r-sm)',
-              marginTop:    2,
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'space-between',
+              padding:        '0 10px 4px',
             }}
           >
-            {t.newPocket}
-          </motion.div>
+            <SectionLabel label="Pockets" />
+            {/* New top-level folder button */}
+            <motion.button
+              type="button"
+              whileHover={{ color: 'var(--primary)' }}
+              onClick={() => setNewPocketOpen(true)}
+              title="New top-level folder"
+              style={{
+                border:     'none',
+                background: 'transparent',
+                cursor:     'pointer',
+                color:      'var(--soft)',
+                fontSize:   10,
+                fontFamily: 'var(--font-ui)',
+                padding:    '0 2px',
+                lineHeight: 1,
+              }}
+            >
+              +
+            </motion.button>
+          </div>
 
-          {/* Pocket name input (spring-in) */}
+          {/* New top-level folder inline input */}
           <AnimatePresence>
             {newPocketOpen && (
               <motion.div
-                initial={{ height: 0, opacity: 0, y: -6 }}
+                initial={{ height: 0, opacity: 0, y: -4 }}
                 animate={{ height: 'auto', opacity: 1, y: 0 }}
-                exit={{ height: 0, opacity: 0, y: -6 }}
+                exit={{ height: 0, opacity: 0, y: -4 }}
                 transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                 style={{ overflow: 'hidden', padding: '0 6px' }}
               >
@@ -362,7 +298,7 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
                   ref={pocketInputRef}
                   value={newPocketName}
                   onChange={(e) => setNewPocketName(e.target.value)}
-                  placeholder="Pocket name…"
+                  placeholder="Folder name…"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter')  { e.preventDefault(); submitNewPocket(); }
                     if (e.key === 'Escape') { e.preventDefault(); setNewPocketName(''); setNewPocketOpen(false); }
@@ -373,8 +309,8 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
                   }}
                   style={{
                     width:        '100%',
-                    margin:       '6px 0 4px',
-                    padding:      '7px 10px',
+                    margin:       '4px 0',
+                    padding:      '6px 10px',
                     fontSize:     11,
                     borderRadius: 8,
                     border:       '0.5px solid var(--primary)',
@@ -387,6 +323,109 @@ const Sidebar = ({ view, onViewChange }: { view?: AppView; onViewChange?: (v: Ap
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* ── File tree (when vault is loaded) / flat pocket list (fallback) ── */}
+          {vaultTree ? (
+            /* Vault is open — render the recursive file tree */
+            <FileTree nodes={vaultTree.children} vaultPath={vaultPath ?? ''} />
+          ) : (
+            /* No vault yet — render the classic flat Pocket list as fallback */
+            <AnimatePresence initial={false}>
+              {pockets.map((p: Pocket) => {
+                const isActive     = activePocket === p.id;
+                const isDeleting   = confirmDeletePocket === p.id;
+                const isDropTarget = isDraggingAny && hoveredPocketId === p.id;
+                return (
+                  <motion.div
+                    key={p.id}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <motion.div
+                      animate={{ scale: isDropTarget ? 1.025 : 1 }}
+                      transition={{ type: 'spring', stiffness: 600, damping: 35 }}
+                      style={{ transformOrigin: 'left center' }}
+                    >
+                      <motion.div
+                        data-pocket-id={p.id}
+                        whileHover={{
+                          background: pocketGlow(p.color, 0.15),
+                          color:      'var(--primary)',
+                        }}
+                        onClick={() => setActivePocket(p.id)}
+                        className={`sidebar-pocket-item${isDropTarget ? ' sidebar-pocket-item--droptarget' : ''}`}
+                        style={{
+                          display:      'flex',
+                          alignItems:   'center',
+                          gap:           8,
+                          // Pocket color always visible as a 2.5px left border —
+                          // this replaces the tiny dot as the primary color signal.
+                          borderLeft:   `2.5px solid ${p.color}`,
+                          padding:      '6px 10px 6px 8px',
+                          borderRadius: '0 var(--r-sm) var(--r-sm) 0',
+                          cursor:       'pointer',
+                          fontSize:      11,
+                          marginBottom:  2,
+                          color:         isDropTarget || isActive ? 'var(--primary)' : 'var(--muted)',
+                          background:    isDropTarget
+                            ? pocketGlow(p.color, 0.22)
+                            : isActive
+                              ? pocketGlow(p.color, 0.12)
+                              : pocketGlow(p.color, 0.04),
+                          fontWeight:    isActive ? 600 : 400,
+                          transition:   'background 0.12s, color 0.12s, border-color 0.12s',
+                        }}
+                      >
+                        {/* Color dot — visible only while dragging for drop-target pulse */}
+                        {isDraggingAny && (
+                          <motion.div
+                            animate={isDropTarget
+                              ? { scale: [1, 1.55, 1], transition: { repeat: Infinity, duration: 0.85, ease: 'easeInOut' } }
+                              : { scale: 1,             transition: { type: 'spring', stiffness: 400, damping: 20 } }
+                            }
+                            style={{
+                              width: 7, height: 7, borderRadius: '50%',
+                              background: p.color,
+                              boxShadow:  isDropTarget
+                                ? `0 0 10px ${pocketGlow(p.color, 0.8)}`
+                                : `0 0 6px ${pocketGlow(p.color, 0.5)}`,
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        {/* Emoji trigger — replaces the static inline emoji prefix */}
+                        <EmojiPicker
+                          emoji={p.emoji}
+                          defaultEmoji="📂"
+                          onSelect={(em) => setPocketEmoji(p.id, em)}
+                        />
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.name}
+                        </span>
+                        <button
+                          type="button"
+                          className="sidebar-pocket-delete"
+                          onClick={(e) => onDeletePocket(p.id, e)}
+                          title={isDeleting ? 'Click again to delete' : 'Delete pocket'}
+                          style={{
+                            opacity: isDeleting ? 1 : undefined,
+                            color:   isDeleting ? '#FF5252' : undefined,
+                            background: isDeleting ? 'rgba(255,82,82,0.1)' : undefined,
+                            fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 5,
+                          }}
+                        >
+                          {isDeleting ? 'del?' : '✕'}
+                        </button>
+                      </motion.div>
+                    </motion.div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          )}
         </div>
 
         {/* ── Zone 3: Vault info + dark-mode toggle (fixed bottom) ─────── */}

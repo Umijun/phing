@@ -26,18 +26,31 @@ export const ghostY = motionValue(0);
 // ── Drag state ────────────────────────────────────────────────────────────────
 
 export interface DraggingNote {
+  kind:    'note';
   noteId:  string;
   title:   string;
   emoji?:  string;
-  folder:  string; // current folder — used to skip no-op drops
+  /** Current folder — used to skip no-op drops. */
+  folder:  string;
 }
 
+export interface DraggingBoard {
+  kind:    'board';
+  boardId: string;
+  title:   string;
+  /** Current folder — used to skip no-op drops. */
+  folder:  string;
+}
+
+/** Union of every item type that can be dragged into a Pocket. */
+export type DraggingItem = DraggingNote | DraggingBoard;
+
 interface NoteDragStore {
-  dragging:         DraggingNote | null;
+  dragging:         DraggingItem | null;
   /** The pocket id currently hovered during drag.  null = not over any target.
-   *  '' = the "All Notes" target (moves note to root folder). */
+   *  '' = the "All Notes" target (moves note/board to root folder). */
   hoveredPocketId:  string | null;
-  setDragging:      (d: DraggingNote | null) => void;
+  setDragging:      (d: DraggingItem | null) => void;
   setHoveredPocket: (id: string | null) => void;
 }
 

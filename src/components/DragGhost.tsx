@@ -60,7 +60,7 @@ const DragGhost = () => {
             {/* Content */}
             <div className="drag-ghost__body">
               <span className="drag-ghost__icon">
-                {dragging.emoji ?? '📄'}
+                {dragging.kind === 'note' ? (dragging.emoji ?? '📄') : '✦'}
               </span>
               <span className="drag-ghost__title">
                 {dragging.title}
