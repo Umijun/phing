@@ -15,10 +15,10 @@
  */
 
 import {
-  exists,
   mkdir,
   readDir,
   readTextFile,
+  rename,
   writeTextFile,
   remove,
 } from '@tauri-apps/plugin-fs';
@@ -90,11 +90,18 @@ export async function saveMindMapDoc(
   doc: MindMapDoc,
 ): Promise<void> {
   const dir = mmDir(vaultPath);
-  if (!(await exists(dir))) {
-    await mkdir(dir, { recursive: true });
-  }
+  // mkdir is idempotent when recursive: true — no exists() check needed, and
+  // avoids the Tauri ACL scope issue that blocks the `exists` command on hidden
+  // directories such as `.phing/mindmaps`.
+  await mkdir(dir, { recursive: true });
   const updated: MindMapDoc = { ...doc, updatedAt: new Date().toISOString() };
-  await writeTextFile(docPath(vaultPath, doc.id), JSON.stringify(updated, null, 2));
+  const finalPath = docPath(vaultPath, doc.id);
+  const tmpPath   = `${finalPath}.tmp`;
+  // Write to a temp file first, then atomically rename over the final path.
+  // Mirrors the pattern used by noteStore so a crash mid-write never
+  // leaves a truncated or partially-written JSON file.
+  await writeTextFile(tmpPath, JSON.stringify(updated, null, 2));
+  await rename(tmpPath, finalPath);
 }
 
 /**
@@ -109,8 +116,9 @@ export async function loadAllMindMapDocs(
   vaultPath: string,
 ): Promise<MindMapDoc[]> {
   const dir = mmDir(vaultPath);
-  if (!(await exists(dir))) return [];
-
+  // If the directory doesn't exist yet, readDir will throw — treat that as
+  // "no maps stored" rather than a hard error.  Avoids exists() which is
+  // blocked by the Tauri ACL scope for hidden directories.
   let entries: Awaited<ReturnType<typeof readDir>>;
   try {
     entries = await readDir(dir);
@@ -166,7 +174,10 @@ export async function deleteMindMapDoc(
   docId: string,
 ): Promise<void> {
   const path = docPath(vaultPath, docId);
-  if (await exists(path)) {
+  // Attempt removal directly; swallow the error when the file is already gone.
+  try {
     await remove(path);
+  } catch {
+    // Not found — nothing to do.
   }
 }

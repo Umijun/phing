@@ -116,6 +116,8 @@ interface NoteStore {
   flushActiveNote: () => Promise<void>;
   /** Flush every note that has a pending debounce write — called on app quit. */
   flushAllPending: () => Promise<void>;
+  /** True when any note has a pending debounce timer or an in-flight write. */
+  hasPendingWrites: () => boolean;
   /** Reload a note from its on-disk file, replacing the in-memory version. */
   reloadNote: (noteId: string) => Promise<void>;
 
@@ -163,7 +165,7 @@ const SAMPLE_NOTES: Note[] = [
 ].map((n) => ({ ...n, content: stripLegacyBody(n.content) }));
 
 const flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const FLUSH_DELAY_MS = 500;
+const FLUSH_DELAY_MS = 100;
 
 function getVaultPath(): string | null {
   return useVaultStore.getState().vaultPath;
@@ -392,6 +394,8 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       [...pendingIds].map((id) => get().flushNote(id)),
     );
   },
+
+  hasPendingWrites: () => flushTimers.size > 0 || get().dirtyNoteIds.size > 0,
 
   reloadNote: async (noteId) => {
     const vaultPath = getVaultPath();
