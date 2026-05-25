@@ -452,8 +452,12 @@ const BoardInner = () => {
   const isDark  = useNoteStore((s) => s.isDark);
   const { fitView, setCenter } = useReactFlow();
 
-  const boardRef       = useRef<HTMLDivElement>(null);
-  const prevEditingRef = useRef<string | null>(null);
+  const boardRef            = useRef<HTMLDivElement>(null);
+  const prevEditingRef      = useRef<string | null>(null);
+  const prevNotePopupRef    = useRef<string | null>(null);
+  // Set to true for 300 ms after inline label editing ends so that a held
+  // Enter key does not immediately trigger "add sibling" on the board.
+  const editJustCommittedRef = useRef(false);
 
   const [pocketFilter, setPocketFilter] = useState<string>('*');
 
@@ -473,9 +477,10 @@ const BoardInner = () => {
         type:     'mindMapNode',
         position: { x: n.x, y: n.y },
         data: {
-          label:   n.label,
-          depth:   n.depth,
-          hasNote: !!(n.noteContent?.trim()),
+          label:     n.label,
+          depth:     n.depth,
+          hasNote:   !!(n.noteContent?.trim()),
+          direction: n.direction,
         } satisfies MindMapNodeData,
         selected:   n.id === selectedId,
         draggable:  false,
@@ -484,11 +489,15 @@ const BoardInner = () => {
         height:     n.height,
       })),
       edges: layout.edges.map((e) => ({
-        id:        e.id,
-        source:    e.sourceId,
-        target:    e.targetId,
-        type:      'mindMapEdge',
-        focusable: false,
+        id:           e.id,
+        source:       e.sourceId,
+        target:       e.targetId,
+        type:         'mindMapEdge',
+        focusable:    false,
+        // Connect the correct named handles so left-side edges curve rightward
+        // and right-side edges curve leftward — matching the bi-directional layout.
+        sourceHandle: e.direction === 'left' ? 'source-left'  : 'source-right',
+        targetHandle: e.direction === 'left' ? 'target-right' : 'target-left',
       })),
     };
   }, [tree, selectedId]);
@@ -515,17 +524,32 @@ const BoardInner = () => {
   }, [selectedMapId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Refocus board after inline label editing ends ─────────────────────────
+  // Also sets a brief cooldown so a held Enter key doesn't fire "add sibling"
+  // on the board immediately after the commit.
   useEffect(() => {
     if (prevEditingRef.current !== null && editingId === null) {
+      editJustCommittedRef.current = true;
+      const t = setTimeout(() => { editJustCommittedRef.current = false; }, 300);
       focusBoard();
+      return () => clearTimeout(t);
     }
     prevEditingRef.current = editingId;
   }, [editingId, focusBoard]);
 
+  // ── Refocus board after the note pane closes ──────────────────────────────
+  useEffect(() => {
+    if (prevNotePopupRef.current !== null && notePopupId === null) {
+      focusBoard();
+    }
+    prevNotePopupRef.current = notePopupId;
+  }, [notePopupId, focusBoard]);
+
   // ── Keyboard handler ──────────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (editingId) return;
+      // Bail while a node label is being edited, or for 300 ms after committing
+      // (prevents a held Enter from immediately triggering "add sibling").
+      if (editingId || editJustCommittedRef.current) return;
 
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'n') {
         e.preventDefault();

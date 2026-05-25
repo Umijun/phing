@@ -6,6 +6,8 @@ export interface MindMapNodeData {
   label: string;
   depth: number;
   hasNote: boolean;
+  /** Which side of the root this node is on.  Determines handle positions. */
+  direction: 'left' | 'right';
   [key: string]: unknown;
 }
 
@@ -72,11 +74,14 @@ export const MindMapNode = ({ id, data, selected }: NodeProps) => {
           </svg>
         </button>
       )}
-      {/* Target handle (left) — hidden for root */}
+      {/* Target handle — hidden for root; position mirrors the direction.
+          Left-side nodes receive edges from the RIGHT (parent is to the right),
+          right-side nodes from the LEFT (parent is to the left). */}
       {!isRoot && (
         <Handle
           type="target"
-          position={Position.Left}
+          id={nodeData.direction === 'left' ? 'target-right' : 'target-left'}
+          position={nodeData.direction === 'left' ? Position.Right : Position.Left}
           className="mm-handle"
           isConnectable={false}
         />
@@ -102,13 +107,36 @@ export const MindMapNode = ({ id, data, selected }: NodeProps) => {
         <span className="mm-node-label">{nodeData.label}</span>
       )}
 
-      {/* Source handle (right) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="mm-handle"
-        isConnectable={false}
-      />
+      {/* Source handle(s).
+          Root: needs one handle on each side for right- and left-branching edges.
+          Non-root: single handle on the outgoing side (right for right-side nodes,
+          left for left-side nodes). */}
+      {isRoot ? (
+        <>
+          <Handle
+            type="source"
+            id="source-right"
+            position={Position.Right}
+            className="mm-handle"
+            isConnectable={false}
+          />
+          <Handle
+            type="source"
+            id="source-left"
+            position={Position.Left}
+            className="mm-handle"
+            isConnectable={false}
+          />
+        </>
+      ) : (
+        <Handle
+          type="source"
+          id={nodeData.direction === 'left' ? 'source-left' : 'source-right'}
+          position={nodeData.direction === 'left' ? Position.Left : Position.Right}
+          className="mm-handle"
+          isConnectable={false}
+        />
+      )}
     </div>
   );
 };

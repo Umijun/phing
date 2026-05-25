@@ -107,12 +107,16 @@ export interface LayoutNode {
   depth: number;
   parentId: string | null;
   noteContent?: string;
+  /** Which side of the root this node sits on.  Root itself is 'right'. */
+  direction: 'left' | 'right';
 }
 
 export interface LayoutEdge {
   id: string;
   sourceId: string;
   targetId: string;
+  /** Determines which named handles the edge connects (source-left/right, target-left/right). */
+  direction: 'left' | 'right';
 }
 
 // Layout constants
@@ -168,9 +172,10 @@ function subtreeH(node: MindMapNode, depth: number): number {
 function layoutRecurse(
   node: MindMapNode,
   x: number,
-  cy: number, // centre-y of this node
+  cy: number,       // centre-y of this node
   depth: number,
-  parentId: string | null,
+  parentId: string,
+  direction: 'left' | 'right',
   outNodes: LayoutNode[],
   outEdges: LayoutEdge[],
 ) {
@@ -187,15 +192,13 @@ function layoutRecurse(
     depth,
     parentId,
     noteContent: node.noteContent,
+    direction,
   });
 
-  if (parentId) {
-    outEdges.push({ id: `e-${parentId}-${node.id}`, sourceId: parentId, targetId: node.id });
-  }
+  outEdges.push({ id: `e-${parentId}-${node.id}`, sourceId: parentId, targetId: node.id, direction });
 
   if (!node.children.length) return;
 
-  const childX = x + w + H_GAP;
   const totalH =
     node.children.reduce((s, c) => s + subtreeH(c, depth + 1), 0) +
     V_GAP * (node.children.length - 1);
@@ -203,15 +206,74 @@ function layoutRecurse(
 
   for (const child of node.children) {
     const ch = subtreeH(child, depth + 1);
-    layoutRecurse(child, childX, childY + ch / 2, depth + 1, node.id, outNodes, outEdges);
+    // For right-side subtrees the child's LEFT edge starts after the parent's
+    // right edge.  For left-side subtrees the child's RIGHT edge ends just
+    // before the parent's left edge — so we subtract the child width too.
+    const cw     = estimateNodeWidth(child.label, depth + 1);
+    const childX = direction === 'right' ? x + w + H_GAP : x - H_GAP - cw;
+    layoutRecurse(child, childX, childY + ch / 2, depth + 1, node.id, direction, outNodes, outEdges);
     childY += ch + V_GAP;
   }
 }
 
+/**
+ * Calculates a balanced bi-directional layout.
+ *
+ * The root is fixed at the origin.  Its children are distributed alternately:
+ * even-indexed children (0, 2, 4 …) branch to the RIGHT; odd-indexed children
+ * (1, 3, 5 …) branch to the LEFT.  Each side is independently centred on the
+ * horizontal axis so the overall map stays visually balanced regardless of
+ * subtree depth or label length.
+ */
 export function calculateLayout(root: MindMapNode): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
   const nodes: LayoutNode[] = [];
   const edges: LayoutEdge[] = [];
-  layoutRecurse(root, 0, 0, 0, null, nodes, edges);
+
+  // ── Root node ────────────────────────────────────────────────────────────────
+  const rw = estimateNodeWidth(root.label, 0);
+  const rh = estimateNodeHeight(root.label, rw, 0);
+  nodes.push({
+    id:          root.id,
+    label:       root.label,
+    x:           0,
+    y:           -rh / 2,
+    width:       rw,
+    height:      rh,
+    depth:       0,
+    parentId:    null,
+    noteContent: root.noteContent,
+    direction:   'right', // root renders handles on both sides; field is nominal
+  });
+
+  // ── Split children: even indices → right, odd indices → left ─────────────
+  const rightChildren = root.children.filter((_, i) => i % 2 === 0);
+  const leftChildren  = root.children.filter((_, i) => i % 2 !== 0);
+
+  // Right subtrees — centred around y = 0
+  const rightTotalH =
+    rightChildren.reduce((s, c) => s + subtreeH(c, 1), 0) +
+    V_GAP * Math.max(0, rightChildren.length - 1);
+  let rightY = -rightTotalH / 2;
+
+  for (const child of rightChildren) {
+    const ch = subtreeH(child, 1);
+    layoutRecurse(child, rw + H_GAP, rightY + ch / 2, 1, root.id, 'right', nodes, edges);
+    rightY += ch + V_GAP;
+  }
+
+  // Left subtrees — centred around y = 0
+  const leftTotalH =
+    leftChildren.reduce((s, c) => s + subtreeH(c, 1), 0) +
+    V_GAP * Math.max(0, leftChildren.length - 1);
+  let leftY = -leftTotalH / 2;
+
+  for (const child of leftChildren) {
+    const cw = estimateNodeWidth(child.label, 1);
+    const ch = subtreeH(child, 1);
+    layoutRecurse(child, -H_GAP - cw, leftY + ch / 2, 1, root.id, 'left', nodes, edges);
+    leftY += ch + V_GAP;
+  }
+
   return { nodes, edges };
 }
 

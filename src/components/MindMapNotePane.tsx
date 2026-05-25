@@ -58,13 +58,27 @@ export const MindMapNotePane = ({
   });
 
   // ── Auto-save on unmount ───────────────────────────────────────────────────
-  // Covers every close path: X button, ⌘⇧N toggle, board/pocket switch.
+  // Covers every close path: X button, ⌘⇧N toggle, Escape, board/pocket switch.
   // Using a ref means we never capture stale state in the closure.
   useEffect(() => {
     return () => {
       onSave(nodeId, contentRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Escape closes the pane ────────────────────────────────────────────────
+  // Registered at document capture so it fires before Tiptap or the board
+  // can swallow the event.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
+  }, [onClose]);
 
   // ── Slide-in / slide-out spring ───────────────────────────────────────────
   return (
