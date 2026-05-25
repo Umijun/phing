@@ -120,8 +120,8 @@ export interface LayoutEdge {
 }
 
 // Layout constants
-const H_GAP = 80;  // horizontal gap between parent right-edge and child left-edge
-const V_GAP = 18;  // vertical gap between sibling subtrees
+const H_GAP = 44;  // compact horizontal gap between parent and child branches
+const V_GAP = 8;   // tight vertical gap between sibling subtrees
 
 /**
  * Estimate the rendered pixel width for a node label.

@@ -460,11 +460,12 @@ const BoardInner = () => {
   const pockets = useNoteStore((s) => s.pockets);
   const isDark  = useNoteStore((s) => s.isDark);
   const isSidebarOpen = useNoteStore((s) => s.isSidebarOpen);
-  const { fitView, setCenter } = useReactFlow();
+  const { fitView, setCenter, getZoom } = useReactFlow();
 
   const boardRef            = useRef<HTMLDivElement>(null);
   const prevEditingRef      = useRef<string | null>(null);
   const prevNotePopupRef    = useRef<string | null>(null);
+  const prevPanelStateRef   = useRef<{ notePopupId: string | null; isSidebarOpen: boolean } | null>(null);
   // Set to true for 300 ms after inline label editing ends so that a held
   // Enter key does not immediately trigger "add sibling" on the board.
   const editJustCommittedRef = useRef(false);
@@ -556,13 +557,23 @@ const BoardInner = () => {
     [layout, layoutById],
   );
 
+  const panToNode = useCallback(
+    (nodeId: string | null, duration = 300) => {
+      const id = nodeId ?? tree.id;
+      const n = layoutById.get(id);
+      if (!n) return;
+      setCenter(n.x + n.width / 2, n.y + n.height / 2, {
+        duration,
+        zoom: getZoom(),
+      });
+    },
+    [getZoom, layoutById, setCenter, tree.id],
+  );
+
   // ── Pan viewport to newly selected node ───────────────────────────────────
   useEffect(() => {
-    if (!selectedId) return;
-    const n = layoutById.get(selectedId);
-    if (!n) return;
-    setCenter(n.x + n.width / 2, n.y + n.height / 2, { duration: 320, zoom: 1 });
-  }, [selectedId, layoutById]); // eslint-disable-line react-hooks/exhaustive-deps
+    panToNode(selectedId, 320);
+  }, [selectedId, panToNode]);
 
   // ── Initial fit-view + root selection ─────────────────────────────────────
   useEffect(() => {
@@ -577,23 +588,25 @@ const BoardInner = () => {
     focusBoard();
   }, [selectedMapId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Keep React Flow centred while side panels animate ─────────────────────
+  // ── Keep the active node centred while side panels animate ────────────────
   useEffect(() => {
-    const startedAt = performance.now();
-    let raf = 0;
+    const previous = prevPanelStateRef.current;
+    prevPanelStateRef.current = { notePopupId, isSidebarOpen };
+    if (
+      !previous ||
+      (previous.notePopupId === notePopupId && previous.isSidebarOpen === isSidebarOpen)
+    ) {
+      return;
+    }
 
-    const refitDuringPanelMotion = () => {
-      fitView({ padding: 0.35, duration: 0 });
-      if (performance.now() - startedAt < PANEL_TRANSITION_MS) {
-        raf = requestAnimationFrame(refitDuringPanelMotion);
-      } else {
-        fitView({ padding: 0.35, duration: 180 });
-      }
+    const earlyPan = window.setTimeout(() => panToNode(selectedId, 260), 40);
+    const settledPan = window.setTimeout(() => panToNode(selectedId, 220), PANEL_TRANSITION_MS);
+
+    return () => {
+      window.clearTimeout(earlyPan);
+      window.clearTimeout(settledPan);
     };
-
-    raf = requestAnimationFrame(refitDuringPanelMotion);
-    return () => cancelAnimationFrame(raf);
-  }, [notePopupId, isSidebarOpen, fitView]);
+  }, [notePopupId, isSidebarOpen, panToNode, selectedId]);
 
   // ── Refocus board after inline label editing ends ─────────────────────────
   // Also sets a brief cooldown so a held Enter key doesn't fire "add sibling"
