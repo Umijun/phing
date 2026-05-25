@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './styles/theme.css';
 import { useNoteStore } from './store/noteStore';
+import { useNoteStore as noteStoreApi } from './store/noteStore';
 import { useVaultStore } from './store/vaultStore';
 import { useMindMapStore } from './store/mindMapStore';
+import { useMindMapStore as mindMapStoreApi } from './store/mindMapStore';
 import { isTauri } from './lib/tauri';
 import { encodeNote } from './lib/frontmatter';
 import { vaultWatcher, contentHash } from './lib/fileWatcher';
@@ -14,6 +16,7 @@ import CommandPalette from './components/CommandPalette';
 import MindMapBoard from './components/MindMapBoard';
 import Onboarding from './components/Onboarding';
 import ConflictDialogue, { type ConflictInfo } from './components/ConflictDialogue';
+import QuitDialogue from './components/QuitDialogue';
 import DragGhost from './components/DragGhost';
 
 // ── Onboarding guard ───────────────────────────────────────────────────────────
@@ -150,6 +153,114 @@ const App = () => {
 
     return () => { void vaultWatcher.stop(); };
   }, [vaultPath]);
+
+  // ── Flush helpers ─────────────────────────────────────────────────────────
+  // Defined at component level so both the close-event handler and the Save &
+  // Quit dialogue action can share a single stable reference.
+  const flushAll = useCallback(
+    () => Promise.allSettled([
+      noteStoreApi.getState().flushAllPending(),
+      mindMapStoreApi.getState().flushAllPending(),
+    ]),
+    [],
+  );
+
+  // ── Quit dialogue ──────────────────────────────────────────────────────────
+  // Shown when onCloseRequested fires with pending writes so the user can
+  // choose between saving, discarding, or staying.
+
+  const [quitPending, setQuitPending] = useState(false);
+
+  const handleSaveAndQuit = useCallback(async () => {
+    setQuitPending(false);
+    if (!isTauri()) return;
+    const { invoke } = await import('@tauri-apps/api/core');
+    // Safety bail: if flushAll hangs, exit after 5 s anyway so the user
+    // is never left with an unresponsive window.
+    const bail = setTimeout(() => { void invoke('confirm_quit').catch(() => undefined); }, 5_000);
+    await flushAll();
+    clearTimeout(bail);
+    await invoke('confirm_quit').catch(() => undefined);
+  }, [flushAll]);
+
+  const handleDiscard = useCallback(async () => {
+    setQuitPending(false);
+    if (!isTauri()) return;
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('confirm_quit').catch(() => undefined);
+  }, []);
+
+  const handleCancelQuit = useCallback(() => setQuitPending(false), []);
+
+  // ── Flush pending writes on quit ───────────────────────────────────────────
+  // Primary: onCloseRequested intercepts the × button (and Cmd+Q on macOS
+  // when the OS closes windows before terminating).  event.preventDefault()
+  // holds the window open; the QuitDialogue then lets the user choose between
+  // Save & Quit, Discard, or Cancel.  We always show the dialogue — skipping
+  // it when hasPendingWrites() is false causes a race where the 100 ms debounce
+  // has already cleared by the time the user reaches for the × button.
+  //
+  // Secondary: pagehide / visibilitychange are fire-and-forget backups for
+  // force-quit or any path that bypasses the close event.
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    let unlistenClose: (() => void) | undefined;
+
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const win = getCurrentWindow();
+
+        // Always intercept the close request and hand control to the quit
+        // dialogue.  The dialogue's "Save & Quit" / "Discard" buttons call
+        // win.destroy() themselves, so we never need to close here directly.
+        // Removing the hasPendingWrites() gate prevents the race where the
+        // 100 ms debounce has already completed by the time the user presses ×.
+        unlistenClose = await win.onCloseRequested((event) => {
+          event.preventDefault();
+          setQuitPending(true);
+        });
+      } catch (e) {
+        console.error('[phing] Failed to register onCloseRequested:', e);
+      }
+    })();
+
+    const flushFire = () => { void flushAll(); };
+    const onHidden   = () => { if (document.visibilityState === 'hidden') flushFire(); };
+    window.addEventListener('pagehide', flushFire);
+    document.addEventListener('visibilitychange', onHidden);
+
+    return () => {
+      unlistenClose?.();
+      window.removeEventListener('pagehide', flushFire);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, [flushAll]);
+
+  // ── macOS Cmd+Q interception ───────────────────────────────────────────────
+  // Rust intercepts RunEvent::ExitRequested (the app-level quit signal that
+  // Cmd+Q, Dock → Quit, and NSApp terminate all produce on macOS), cancels
+  // the OS exit, and emits `phing://close-requested` so the same QuitDialogue
+  // that handles the × button is shown here too.
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    let unlisten: (() => void) | undefined;
+
+    void (async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlisten = await listen('phing://close-requested', () => {
+          setQuitPending(true);
+        });
+      } catch (e) {
+        console.error('[phing] Failed to register phing://close-requested listener:', e);
+      }
+    })();
+
+    return () => { unlisten?.(); };
+  }, []);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -307,6 +418,13 @@ const App = () => {
         onReload={handleConflictReload}
         onKeepLocal={handleConflictKeepLocal}
         onDismiss={handleConflictDismiss}
+      />
+
+      <QuitDialogue
+        open={quitPending}
+        onSaveAndQuit={handleSaveAndQuit}
+        onDiscard={handleDiscard}
+        onCancel={handleCancelQuit}
       />
 
       {/* Drag ghost — portal-rendered above all panels, pointer-events: none */}

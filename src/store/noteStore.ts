@@ -114,6 +114,10 @@ interface NoteStore {
   scheduleFlush: (id: string) => void;
   flushNote: (id: string) => Promise<void>;
   flushActiveNote: () => Promise<void>;
+  /** Flush every note that has a pending debounce write — called on app quit. */
+  flushAllPending: () => Promise<void>;
+  /** True when any note has a pending debounce timer or an in-flight write. */
+  hasPendingWrites: () => boolean;
   /** Reload a note from its on-disk file, replacing the in-memory version. */
   reloadNote: (noteId: string) => Promise<void>;
 
@@ -161,7 +165,7 @@ const SAMPLE_NOTES: Note[] = [
 ].map((n) => ({ ...n, content: stripLegacyBody(n.content) }));
 
 const flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const FLUSH_DELAY_MS = 500;
+const FLUSH_DELAY_MS = 100;
 
 function getVaultPath(): string | null {
   return useVaultStore.getState().vaultPath;
@@ -370,6 +374,29 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     await get().flushNote(selectedNoteId);
   },
 
+  flushAllPending: async () => {
+    // Collect every note that is either waiting in the debounce queue OR marked
+    // dirty but not yet queued (shouldn't normally happen, but be defensive).
+    const pendingIds = new Set([
+      ...flushTimers.keys(),
+      ...get().dirtyNoteIds,
+    ]);
+    if (!pendingIds.size) return;
+
+    // Cancel all timers first so they don't double-fire after we save.
+    for (const id of pendingIds) {
+      const t = flushTimers.get(id);
+      if (t) { clearTimeout(t); flushTimers.delete(id); }
+    }
+
+    // Flush in parallel — one failure must not block the others.
+    await Promise.allSettled(
+      [...pendingIds].map((id) => get().flushNote(id)),
+    );
+  },
+
+  hasPendingWrites: () => flushTimers.size > 0 || get().dirtyNoteIds.size > 0,
+
   reloadNote: async (noteId) => {
     const vaultPath = getVaultPath();
     if (!vaultPath || !isTauri()) return;
@@ -448,7 +475,12 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       try {
         await vaultService.deleteNoteFile(vaultPath, note.filePath);
       } catch (e) {
-        console.error('[phing] deleteNote failed', e);
+        // The file delete failed (e.g. permissions error, unsupported FS).
+        // Do NOT remove the note from state — leaving it visible is far safer
+        // than hiding it while the file stays on disk (which causes it to
+        // reappear as a ghost on the next vault load).
+        console.error('[phing] deleteNote failed — note kept in state', e);
+        return;
       }
     }
     set((s) => {

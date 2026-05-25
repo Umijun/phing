@@ -5,12 +5,23 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
     "opener:default",
     "fs:default",
-    "fs:allow-watch",
-    "fs:allow-rename",
-    "dialog:default",
-    "fs:scope-home-recursive",
-    "fs:scope-document-recursive"
+    "fs:allow-home-read-recursive",
+    "fs:allow-home-write-recursive",
+    "fs:allow-document-read-recursive",
+    "fs:allow-document-write-recursive",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$HOME/**/.phing/**" },
+        { "path": "$DOCUMENT/**/.phing/**" }
+      ]
+    },
+    "dialog:default"
   ]
 }

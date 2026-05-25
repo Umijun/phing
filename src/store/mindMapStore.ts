@@ -65,8 +65,17 @@ function makeDoc(title = 'Mind Map', folder = ''): MindMapDoc {
 
 // ── Debounced auto-save ────────────────────────────────────────────────────────
 
-const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const FLUSH_DELAY_MS = 900;
+const saveTimers    = new Map<string, ReturnType<typeof setTimeout>>();
+/**
+ * Docs that have been mutated but whose write may not have completed yet.
+ * Mirrors the `dirtyNoteIds` pattern in noteStore.
+ *
+ * Set when a mutation is scheduled; cleared only when the FS write succeeds.
+ * This ensures flushAllPending catches docs whose 100 ms debounce timer has
+ * already fired but whose async write is still in-flight.
+ */
+const dirtyMindMapIds = new Set<string>();
+const FLUSH_DELAY_MS = 100;
 
 function getVaultPath(): string | null {
   return useVaultStore.getState().vaultPath;
@@ -77,6 +86,8 @@ function scheduleSave(doc: MindMapDoc): void {
   const vaultPath = getVaultPath();
   if (!vaultPath || !isTauri()) return;
 
+  dirtyMindMapIds.add(doc.id); // mark dirty immediately
+
   const existing = saveTimers.get(doc.id);
   if (existing) clearTimeout(existing);
 
@@ -84,9 +95,9 @@ function scheduleSave(doc: MindMapDoc): void {
     doc.id,
     setTimeout(() => {
       saveTimers.delete(doc.id);
-      void saveMindMapDoc(vaultPath, doc).catch((e) =>
-        console.error('[phing] mind map auto-save failed', e),
-      );
+      void saveMindMapDoc(vaultPath, doc)
+        .then(() => { dirtyMindMapIds.delete(doc.id); })
+        .catch((e) => console.error('[phing] mind map auto-save failed', e));
     }, FLUSH_DELAY_MS),
   );
 }
@@ -140,6 +151,11 @@ export interface MindMapStore {
   firstChildId:  (nodeId: string) => string | null;
   prevSiblingId: (nodeId: string) => string | null;
   nextSiblingId: (nodeId: string) => string | null;
+
+  /** Flush all pending debounced saves — called on app quit. */
+  flushAllPending: () => Promise<void>;
+  /** True when any map has a pending debounce timer or an in-flight write. */
+  hasPendingWrites: () => boolean;
 }
 
 // ─── Initial placeholder doc ──────────────────────────────────────────────────
@@ -447,5 +463,35 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
     if (!parent) return null;
     const idx = parent.children.findIndex((c) => c.id === nodeId);
     return idx < parent.children.length - 1 ? parent.children[idx + 1].id : null;
+  },
+
+  hasPendingWrites: () => saveTimers.size > 0 || dirtyMindMapIds.size > 0,
+
+  flushAllPending: async () => {
+    const vaultPath = getVaultPath();
+    if (!vaultPath || !isTauri()) return;
+
+    // Cancel every pending debounce timer — we are writing synchronously now.
+    for (const [id, t] of saveTimers) {
+      clearTimeout(t);
+      saveTimers.delete(id);
+    }
+    dirtyMindMapIds.clear();
+
+    // Save every loaded map unconditionally.  Dirty-tracking can be fooled by
+    // race conditions (timer fired and write completed just before quit), so the
+    // safest approach on quit is to persist the current in-memory state for all
+    // maps regardless.  The cost is a few extra writes; the benefit is that
+    // nothing is ever silently lost.
+    const docs = get().mindMaps;
+    if (!docs.length) return;
+
+    await Promise.allSettled(
+      docs.map((doc) =>
+        saveMindMapDoc(vaultPath, doc).catch((e) =>
+          console.error('[phing] flushAllPending (mind map) failed', e),
+        ),
+      ),
+    );
   },
 }));
