@@ -7,7 +7,7 @@ import {
   setBodyMarkdown,
   restoreCursor,
 } from '../lib/markdown';
-import { useNoteStore, Note, type SyncState } from '../store/noteStore';
+import { useNoteStore, Note, type SyncState, normaliseTag } from '../store/noteStore';
 import { fmtTime24, formatNoteDate } from '../lib/formatTime';
 import { findBacklinks } from '../lib/backlinks';
 import { parseFootnotes } from '../extensions/footnote';
@@ -117,6 +117,9 @@ const Editor = ({ onOpenPalette }: EditorProps) => {
     syncState,
     backlinksOpen,
     toggleBacklinks,
+    addTag,
+    removeTag,
+    tagCounts,
   } = useNoteStore();
 
   const note = notes.find((n: Note) => n.id === selectedNoteId);
@@ -711,40 +714,14 @@ const Editor = ({ onOpenPalette }: EditorProps) => {
               data-placeholder="Add a short description..."
             />
 
-            {note.tags.length > 0 && (
-              <div className="editor-tags" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 28 }}>
-                {note.tags.map((tag: string, ti: number) => {
-                  const p = TAG_PALETTE[ti % TAG_PALETTE.length];
-                  return (
-                    <span
-                      key={tag}
-                      className="editor-tag"
-                      style={{
-                        padding: '4px 12px',
-                        borderRadius: 100,
-                        background: isDark ? 'var(--primary-s)' : p.bg,
-                        color: isDark ? 'var(--primary)' : p.fg,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      #{tag}
-                    </span>
-                  );
-                })}
-                <span
-                  className="editor-tag"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 100,
-                    color: 'var(--muted)',
-                    border: '0.5px dashed var(--border)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  + add a tag
-                </span>
-              </div>
-            )}
+            <TagBar
+              noteId={note.id}
+              tags={note.tags}
+              tagCounts={tagCounts}
+              isDark={isDark}
+              onAdd={(tag) => addTag(note.id, tag)}
+              onRemove={(tag) => removeTag(note.id, tag)}
+            />
 
             <EditorContent
               editor={editor}
@@ -919,6 +896,145 @@ const Editor = ({ onOpenPalette }: EditorProps) => {
         <span>{wordCount} words</span>
         <span>~{readTime} min</span>
       </div>
+    </div>
+  );
+};
+
+// ─── Tag components ──────────────────────────────────────────────────────────
+
+interface TagPillProps {
+  tag:      string;
+  paletteIndex: number;
+  isDark:   boolean;
+  onRemove: () => void;
+}
+
+const TagPill = ({ tag, paletteIndex, isDark, onRemove }: TagPillProps) => {
+  const p = TAG_PALETTE[paletteIndex % TAG_PALETTE.length];
+  return (
+    <span
+      className="editor-tag editor-tag--pill"
+      style={{
+        background: isDark ? 'var(--primary-s)' : p.bg,
+        color:      isDark ? 'var(--primary)'   : p.fg,
+      }}
+    >
+      #{tag}
+      <button
+        type="button"
+        className="editor-tag__remove"
+        onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        aria-label={`Remove tag ${tag}`}
+        tabIndex={-1}
+      >
+        ×
+      </button>
+    </span>
+  );
+};
+
+interface TagBarProps {
+  noteId:    string;
+  tags:      string[];
+  tagCounts: Record<string, number>;
+  isDark:    boolean;
+  onAdd:     (tag: string) => void;
+  onRemove:  (tag: string) => void;
+}
+
+const TagBar = ({ tags, tagCounts, isDark, onAdd, onRemove }: TagBarProps) => {
+  const [isAdding, setIsAdding]   = React.useState(false);
+  const [draft,    setDraft]      = React.useState('');
+  const inputRef                  = React.useRef<HTMLInputElement>(null);
+
+  // Suggestions: existing vault tags that start with the draft and aren't already on this note.
+  const suggestions = React.useMemo(() => {
+    const q = draft.trim().toLowerCase();
+    if (!q) return [];
+    return Object.keys(tagCounts)
+      .filter((t) => t.startsWith(q) && !tags.includes(t))
+      .sort((a, b) => tagCounts[b] - tagCounts[a]) // most-used first
+      .slice(0, 6);
+  }, [draft, tagCounts, tags]);
+
+  const startAdding = () => {
+    setIsAdding(true);
+    // Focus after the next paint so the input is mounted.
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const commit = (value = draft) => {
+    const norm = normaliseTag(value);
+    if (norm) onAdd(norm);
+    setDraft('');
+    // Keep input open for multi-add; re-focus for the next tag.
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const cancel = () => {
+    setDraft('');
+    setIsAdding(false);
+  };
+
+  return (
+    <div
+      className="editor-tags"
+      style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 28 }}
+    >
+      {tags.map((tag, ti) => (
+        <TagPill
+          key={tag}
+          tag={tag}
+          paletteIndex={ti}
+          isDark={isDark}
+          onRemove={() => onRemove(tag)}
+        />
+      ))}
+
+      {isAdding ? (
+        <div style={{ position: 'relative' }}>
+          <input
+            ref={inputRef}
+            className="editor-tag-input"
+            value={draft}
+            maxLength={40}
+            placeholder="add tag…"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+              if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            }}
+            // onBlur fires only when focus leaves to something other than a
+            // suggestion button (those use onMouseDown + preventDefault).
+            onBlur={cancel}
+          />
+
+          {suggestions.length > 0 && (
+            <div className="tag-suggestions">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className="tag-suggestion-item"
+                  // preventDefault keeps focus on the input so onBlur doesn't fire.
+                  onMouseDown={(e) => { e.preventDefault(); commit(s); }}
+                >
+                  <span>#{s}</span>
+                  <span className="tag-suggestion-count">{tagCounts[s]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="editor-tag editor-tag--add"
+          onClick={startAdding}
+        >
+          + add a tag
+        </button>
+      )}
     </div>
   );
 };

@@ -37,12 +37,23 @@ import { MindMapNotePane } from './MindMapNotePane';
 const MindMapEdge = ({
   sourceX, sourceY, targetX, targetY,
   sourcePosition, targetPosition,
+  data,
 }: EdgeProps) => {
+  // Taper stroke by depth: level-1 edges are thicker, leaves hair-thin.
+  const edgeData    = data as { depth?: number; branchIndex?: number } | undefined;
+  const depth       = edgeData?.depth ?? 1;
+  const branchIndex = edgeData?.branchIndex ?? -1;
+  const strokeWidth = depth <= 1 ? 2.0 : depth === 2 ? 1.4 : 1.0;
+  const opacity     = depth <= 1 ? 0.42 : depth === 2 ? 0.35 : 0.28;
+  // Use the branch colour when available; fall back to the taro primary.
+  const strokeColor = branchIndex >= 0
+    ? `var(--branch-${(branchIndex % 8) + 1})`
+    : 'var(--primary)';
   const [edgePath] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   return (
     <BaseEdge
       path={edgePath}
-      style={{ stroke: 'var(--primary)', strokeOpacity: 0.38, strokeWidth: 1.8, fill: 'none' }}
+      style={{ stroke: strokeColor, strokeOpacity: opacity, strokeWidth, fill: 'none' }}
     />
   );
 };
@@ -494,10 +505,11 @@ const BoardInner = () => {
         type:     'mindMapNode',
         position: { x: n.x, y: n.y },
         data: {
-          label:     n.label,
-          depth:     n.depth,
-          hasNote:   !!(n.noteContent?.trim()),
-          direction: n.direction,
+          label:       n.label,
+          depth:       n.depth,
+          hasNote:     !!(n.noteContent?.trim()),
+          direction:   n.direction,
+          branchIndex: n.branchIndex,
         } satisfies MindMapNodeData,
         selected:   n.id === selectedId,
         draggable:  false,
@@ -515,6 +527,7 @@ const BoardInner = () => {
         // and right-side edges curve leftward — matching the bi-directional layout.
         sourceHandle: e.direction === 'left' ? 'source-left'  : 'source-right',
         targetHandle: e.direction === 'left' ? 'target-right' : 'target-left',
+        data:         { depth: e.depth, branchIndex: e.branchIndex },
       })),
     };
   }, [layout, selectedId]);

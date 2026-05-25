@@ -109,6 +109,11 @@ export interface LayoutNode {
   noteContent?: string;
   /** Which side of the root this node sits on.  Root itself is 'right'. */
   direction: 'left' | 'right';
+  /**
+   * Index of the root's direct child that is the ancestor of (or is) this node.
+   * -1 for the root itself.  Used to assign a stable branch colour.
+   */
+  branchIndex: number;
 }
 
 export interface LayoutEdge {
@@ -117,6 +122,13 @@ export interface LayoutEdge {
   targetId: string;
   /** Determines which named handles the edge connects (source-left/right, target-left/right). */
   direction: 'left' | 'right';
+  /** Depth of the target node — used for tapered stroke rendering. */
+  depth: number;
+  /**
+   * Mirrors the branchIndex of the target node.
+   * -1 for the root-to-L1 edge source side (edge itself carries L1's index).
+   */
+  branchIndex: number;
 }
 
 // Layout constants
@@ -130,13 +142,13 @@ const V_GAP = 8;   // tight vertical gap between sibling subtrees
  * for the fonts used at each depth level (Lora for root, LINESeedSans for
  * children).  Avoids a DOM measurement round-trip.
  *
- * Min 90 px · Max 280 px.
+ * Min 90 px · Max 200 px (hard cap keeps the tree compact; long labels wrap).
  */
 export function estimateNodeWidth(label: string, depth: number): number {
   const charPx = depth === 0 ? 9.5 : 8;  // root uses a slightly wider serif font
-  const hPad   = depth === 0 ? 56  : 36; // horizontal padding inside the pill
+  const hPad   = depth === 0 ? 48  : 32; // horizontal padding inside the pill
   const raw    = label.length * charPx + hPad;
-  return Math.max(90, Math.min(280, raw));
+  return Math.max(80, Math.min(200, raw));
 }
 
 /**
@@ -150,8 +162,8 @@ export function estimateNodeWidth(label: string, depth: number): number {
  */
 export function estimateNodeHeight(label: string, width: number, depth: number): number {
   const charPx       = depth === 0 ? 9.5 : 8;
-  const hPad         = depth === 0 ? 56  : 36;
-  const vPad         = depth === 0 ? 26  : 18;  // top + bottom padding sum
+  const hPad         = depth === 0 ? 48  : 32;  // must match estimateNodeWidth hPad
+  const vPad         = depth === 0 ? 26  : depth === 1 ? 20 : 16; // top + bottom padding sum
   const lineH        = depth === 0 ? 22  : 20;  // px per wrapped line
   const innerW       = Math.max(1, width - hPad);
   const charsPerLine = Math.max(1, Math.floor(innerW / charPx));
@@ -187,6 +199,7 @@ function layoutRecurse(
   depth: number,
   parentId: string,
   direction: 'left' | 'right',
+  branchIndex: number,
   outNodes: LayoutNode[],
   outEdges: LayoutEdge[],
 ) {
@@ -204,9 +217,10 @@ function layoutRecurse(
     parentId,
     noteContent: node.noteContent,
     direction,
+    branchIndex,
   });
 
-  outEdges.push({ id: `e-${parentId}-${node.id}`, sourceId: parentId, targetId: node.id, direction });
+  outEdges.push({ id: `e-${parentId}-${node.id}`, sourceId: parentId, targetId: node.id, direction, depth, branchIndex });
 
   if (!node.children.length) return;
 
@@ -222,7 +236,7 @@ function layoutRecurse(
     // before the parent's left edge — so we subtract the child width too.
     const cw     = estimateNodeWidth(child.label, depth + 1);
     const childX = direction === 'right' ? x + w + H_GAP : x - H_GAP - cw;
-    layoutRecurse(child, childX, childY + ch / 2, depth + 1, node.id, direction, outNodes, outEdges);
+    layoutRecurse(child, childX, childY + ch / 2, depth + 1, node.id, direction, branchIndex, outNodes, outEdges);
     childY += ch + V_GAP;
   }
 }
@@ -253,37 +267,39 @@ export function calculateLayout(root: MindMapNode): { nodes: LayoutNode[]; edges
     parentId:    null,
     noteContent: root.noteContent,
     direction:   'right', // root renders handles on both sides; field is nominal
+    branchIndex: -1,      // root has no branch colour
   });
 
-  // ── Split children by branch weight rather than source index ─────────────
-  const rightChildren: MindMapNode[] = [];
-  const leftChildren: MindMapNode[] = [];
+  // ── Split children by branch weight; preserve original index for colour stability ───
+  type IndexedChild = { node: MindMapNode; branchIndex: number };
+  const rightChildren: IndexedChild[] = [];
+  const leftChildren:  IndexedChild[] = [];
 
-  for (const child of root.children) {
-    const rightHeight = branchHeightAfterAdd(rightChildren, child);
-    const leftHeight = branchHeightAfterAdd(leftChildren, child);
-    if (rightHeight <= leftHeight) rightChildren.push(child);
-    else leftChildren.push(child);
-  }
+  root.children.forEach((child, idx) => {
+    const rightH = branchHeightAfterAdd(rightChildren.map((e) => e.node), child);
+    const leftH  = branchHeightAfterAdd(leftChildren.map((e) => e.node),  child);
+    if (rightH <= leftH) rightChildren.push({ node: child, branchIndex: idx });
+    else                  leftChildren.push({ node: child, branchIndex: idx });
+  });
 
   // Right subtrees — centred around y = 0
-  const rightTotalH = branchStackHeight(rightChildren);
+  const rightTotalH = branchStackHeight(rightChildren.map((e) => e.node));
   let rightY = -rightTotalH / 2;
 
-  for (const child of rightChildren) {
+  for (const { node: child, branchIndex } of rightChildren) {
     const ch = subtreeH(child, 1);
-    layoutRecurse(child, rw + H_GAP, rightY + ch / 2, 1, root.id, 'right', nodes, edges);
+    layoutRecurse(child, rw + H_GAP, rightY + ch / 2, 1, root.id, 'right', branchIndex, nodes, edges);
     rightY += ch + V_GAP;
   }
 
   // Left subtrees — centred around y = 0
-  const leftTotalH = branchStackHeight(leftChildren);
+  const leftTotalH = branchStackHeight(leftChildren.map((e) => e.node));
   let leftY = -leftTotalH / 2;
 
-  for (const child of leftChildren) {
+  for (const { node: child, branchIndex } of leftChildren) {
     const cw = estimateNodeWidth(child.label, 1);
     const ch = subtreeH(child, 1);
-    layoutRecurse(child, -H_GAP - cw, leftY + ch / 2, 1, root.id, 'left', nodes, edges);
+    layoutRecurse(child, -H_GAP - cw, leftY + ch / 2, 1, root.id, 'left', branchIndex, nodes, edges);
     leftY += ch + V_GAP;
   }
 

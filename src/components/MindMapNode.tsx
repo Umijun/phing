@@ -8,6 +8,12 @@ export interface MindMapNodeData {
   hasNote: boolean;
   /** Which side of the root this node is on.  Determines handle positions. */
   direction: 'left' | 'right';
+  /**
+   * Original index of the root's direct child that is the ancestor of this
+   * node (-1 for the root itself).  Used to set --node-branch-rgb so the
+   * node's border / fill inherits the correct branch pastel colour.
+   */
+  branchIndex: number;
   [key: string]: unknown;
 }
 
@@ -44,9 +50,17 @@ export const MindMapNode = ({ id, data, selected }: NodeProps) => {
     : nodeData.depth === 1 ? 'mm-node--l1'
     : 'mm-node--deep';
 
+  const branchIdx = nodeData.branchIndex;
+  // Inject --node-branch-rgb so CSS rules (border, background, glow) pick up
+  // the correct pastel channel without any hardcoded hex values.
+  const branchStyle = branchIdx >= 0
+    ? ({ '--node-branch-rgb': `var(--branch-${(branchIdx % 8) + 1}-rgb)` } as React.CSSProperties)
+    : undefined;
+
   return (
     <div
       className={`mm-node ${depthClass} ${selected ? 'mm-node--selected' : ''} ${hasNote ? 'mm-node--has-note' : ''}`}
+      style={branchStyle}
       onDoubleClick={(e) => { e.stopPropagation(); startEditing(id); }}
       onClick={() => setSelected(id)}
     >

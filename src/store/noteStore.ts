@@ -96,6 +96,8 @@ interface NoteStore {
   syncState: SyncState;
   isLoadingVault: boolean;
   dirtyNoteIds: Set<string>;
+  /** Vault-wide map of tag → number of notes carrying that tag. */
+  tagCounts: Record<string, number>;
 
   updateProfile: (patch: Partial<Profile>) => void;
   selectNote: (id: string | null) => Promise<void>;
@@ -128,6 +130,10 @@ interface NoteStore {
   createNote: (folder?: string, title?: string) => Promise<Note>;
   deleteNote: (id: string) => Promise<void>;
   moveNote: (noteId: string, pocketId: string) => Promise<void>;
+  /** Add a tag to a note; silently ignores duplicates and empty strings. */
+  addTag: (noteId: string, tag: string) => void;
+  /** Remove a tag from a note by exact (already-normalised) value. */
+  removeTag: (noteId: string, tag: string) => void;
 }
 
 const SAMPLE_NOTES: Note[] = [
@@ -179,6 +185,27 @@ function applyNotePatch(notes: Note[], id: string, patch: Partial<Note>): Note[]
   );
 }
 
+/**
+ * Rebuild the vault-wide tag → note-count index from scratch.
+ *
+ * Called only when tags actually change (add/remove, vault load, note delete,
+ * note reload) — never on every keystroke — so O(notes × avg-tags) is fine.
+ */
+function buildTagCounts(notes: Note[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const note of notes) {
+    for (const tag of note.tags) {
+      counts[tag] = (counts[tag] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/** Normalise a raw tag string: trim, lowercase, collapse spaces to hyphens. */
+export function normaliseTag(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+}
+
 const initialVaultPath =
   typeof localStorage !== 'undefined' ? localStorage.getItem('phing_vault_path') : null;
 
@@ -201,6 +228,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   syncState: INITIAL_SYNC_STATE,
   isLoadingVault: false,
   dirtyNoteIds: new Set(),
+  tagCounts: buildTagCounts(useSampleData ? SAMPLE_NOTES : []),
 
   updateProfile: (patch) => {
     const profile = { ...get().profile, ...patch };
@@ -269,6 +297,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       const notes = await vaultService.scanVault(path);
       set({
         notes,
+        tagCounts: buildTagCounts(notes),
         selectedNoteId: notes[0]?.id ?? null,
         isLoadingVault: false,
         dirtyNoteIds: new Set(),
@@ -297,10 +326,13 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     set((s) => {
       const dirty = new Set(s.dirtyNoteIds);
       dirty.add(id);
+      const updatedNotes = applyNotePatch(s.notes, id, patch);
       return {
-        notes: applyNotePatch(s.notes, id, patch),
+        notes: updatedNotes,
         dirtyNoteIds: dirty,
         syncState: { ...s.syncState, status: 'dirty' },
+        // Only rebuild the index when tags actually changed — never on keystrokes.
+        ...('tags' in patch && { tagCounts: buildTagCounts(updatedNotes) }),
       };
     });
     get().scheduleFlush(id);
@@ -412,19 +444,23 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       const fresh = await vaultService.readNote(vaultPath, note.filePath);
       if (!fresh) return;
 
-      set((s) => ({
-        notes: s.notes.map((n) =>
+      set((s) => {
+        const updatedNotes = s.notes.map((n) =>
           n.id === noteId
             ? { ...fresh, id: noteId, filePath: note.filePath }
             : n,
-        ),
-        dirtyNoteIds: new Set([...s.dirtyNoteIds].filter((d) => d !== noteId)),
-        syncState: {
-          status: 'synced',
-          lastSyncedAt: new Date().toISOString(),
-          errorMessage: null,
-        },
-      }));
+        );
+        return {
+          notes: updatedNotes,
+          tagCounts: buildTagCounts(updatedNotes),
+          dirtyNoteIds: new Set([...s.dirtyNoteIds].filter((d) => d !== noteId)),
+          syncState: {
+            status: 'synced',
+            lastSyncedAt: new Date().toISOString(),
+            errorMessage: null,
+          },
+        };
+      });
     } catch (e) {
       console.error('[phing] reloadNote failed', e);
     }
@@ -494,8 +530,26 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       if (s.selectedNoteId === id) {
         nextId = remaining[Math.min(idx, remaining.length - 1)]?.id ?? null;
       }
-      return { notes: remaining, selectedNoteId: nextId };
+      return {
+        notes: remaining,
+        tagCounts: buildTagCounts(remaining),
+        selectedNoteId: nextId,
+      };
     });
+  },
+
+  addTag: (noteId, rawTag) => {
+    const tag = normaliseTag(rawTag);
+    if (!tag) return;
+    const note = get().notes.find((n) => n.id === noteId);
+    if (!note || note.tags.includes(tag)) return;
+    get().patchNote(noteId, { tags: [...note.tags, tag] });
+  },
+
+  removeTag: (noteId, tag) => {
+    const note = get().notes.find((n) => n.id === noteId);
+    if (!note) return;
+    get().patchNote(noteId, { tags: note.tags.filter((t) => t !== tag) });
   },
 
   moveNote: async (noteId, pocketId) => {
