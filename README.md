@@ -60,7 +60,7 @@ Crafted with obsessive attention to detail using:
 | `⌘N` | New note |
 | `⌘⇧Z` | Toggle Zen mode |
 | `⌘⇧A` | Toggle Academic mode (A4 paper layout) |
-| `⌘⇧S` | Collapse / expand sidebar + note list panels |
+| `⌘⇧S` | Collapse / expand the main sidebar |
 | `⌘⇧B` | Toggle Backlinks panel |
 | `⌘⌫` | Delete selected note (press twice within 3 seconds to confirm) |
 

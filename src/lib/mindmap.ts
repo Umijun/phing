@@ -169,6 +169,17 @@ function subtreeH(node: MindMapNode, depth: number): number {
   return Math.max(h, childTotal);
 }
 
+function branchStackHeight(children: MindMapNode[]): number {
+  if (!children.length) return 0;
+  return children.reduce((sum, child) => sum + subtreeH(child, 1), 0) +
+    V_GAP * (children.length - 1);
+}
+
+function branchHeightAfterAdd(children: MindMapNode[], child: MindMapNode): number {
+  const extraGap = children.length > 0 ? V_GAP : 0;
+  return branchStackHeight(children) + extraGap + subtreeH(child, 1);
+}
+
 function layoutRecurse(
   node: MindMapNode,
   x: number,
@@ -219,11 +230,10 @@ function layoutRecurse(
 /**
  * Calculates a balanced bi-directional layout.
  *
- * The root is fixed at the origin.  Its children are distributed alternately:
- * even-indexed children (0, 2, 4 …) branch to the RIGHT; odd-indexed children
- * (1, 3, 5 …) branch to the LEFT.  Each side is independently centred on the
- * horizontal axis so the overall map stays visually balanced regardless of
- * subtree depth or label length.
+ * The root is fixed at the origin.  Its immediate children are assigned one by
+ * one to the currently lighter side, measured by estimated subtree height plus
+ * sibling gaps.  Each side is independently centred on the horizontal axis so
+ * deep branches do not visually overpower shallow ones.
  */
 export function calculateLayout(root: MindMapNode): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
   const nodes: LayoutNode[] = [];
@@ -245,14 +255,19 @@ export function calculateLayout(root: MindMapNode): { nodes: LayoutNode[]; edges
     direction:   'right', // root renders handles on both sides; field is nominal
   });
 
-  // ── Split children: even indices → right, odd indices → left ─────────────
-  const rightChildren = root.children.filter((_, i) => i % 2 === 0);
-  const leftChildren  = root.children.filter((_, i) => i % 2 !== 0);
+  // ── Split children by branch weight rather than source index ─────────────
+  const rightChildren: MindMapNode[] = [];
+  const leftChildren: MindMapNode[] = [];
+
+  for (const child of root.children) {
+    const rightHeight = branchHeightAfterAdd(rightChildren, child);
+    const leftHeight = branchHeightAfterAdd(leftChildren, child);
+    if (rightHeight <= leftHeight) rightChildren.push(child);
+    else leftChildren.push(child);
+  }
 
   // Right subtrees — centred around y = 0
-  const rightTotalH =
-    rightChildren.reduce((s, c) => s + subtreeH(c, 1), 0) +
-    V_GAP * Math.max(0, rightChildren.length - 1);
+  const rightTotalH = branchStackHeight(rightChildren);
   let rightY = -rightTotalH / 2;
 
   for (const child of rightChildren) {
@@ -262,9 +277,7 @@ export function calculateLayout(root: MindMapNode): { nodes: LayoutNode[]; edges
   }
 
   // Left subtrees — centred around y = 0
-  const leftTotalH =
-    leftChildren.reduce((s, c) => s + subtreeH(c, 1), 0) +
-    V_GAP * Math.max(0, leftChildren.length - 1);
+  const leftTotalH = branchStackHeight(leftChildren);
   let leftY = -leftTotalH / 2;
 
   for (const child of leftChildren) {

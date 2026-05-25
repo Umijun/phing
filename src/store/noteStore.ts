@@ -89,6 +89,7 @@ interface NoteStore {
   isDark: boolean;
   isZen: boolean;
   isAcademic: boolean;
+  isSidebarOpen: boolean;
   panelsCollapsed: boolean;
   backlinksOpen: boolean;
   lang: 'en' | 'th';
@@ -102,6 +103,7 @@ interface NoteStore {
   toggleDark: () => void;
   toggleZen: () => void;
   toggleAcademic: () => void;
+  toggleSidebar: () => void;
   togglePanels: () => void;
   toggleBacklinks: () => void;
   toggleLang: () => void;
@@ -136,7 +138,7 @@ const SAMPLE_NOTES: Note[] = [
     folder: '',
     description: 'A quiet corner for thinking',
     content:
-      '## Getting Started\n\nPhing is a local-first note-taking app. Your notes live on your own machine as plain Markdown files.\n\n---\n\n## Features\n\n- **Wiki links** — type `[[` to link between notes\n- **Pockets** — organise notes into folders\n- **Mind Map Board** — visualise connections between ideas\n\n### Keyboard Shortcuts\n\n- `⌘K` — command palette\n- `⌘⇧Z` — zen mode\n- `⌘⇧M` — toggle mind map board',
+      '## Getting Started\n\nPhing is a local-first note-taking app. Your notes live on your own machine as plain Markdown files.\n\n---\n\n## Features\n\n- **Wiki links** — type `[[` to link between notes\n- **Pockets** — organise notes into folders\n- **Mind Map Board** — visualise connections between ideas\n\n### Keyboard Shortcuts\n\n- `⌘K` — command palette\n- `⌘⇧Z` — zen mode\n- `⌘⇧S` — toggle sidebar\n- `⌘⇧M` — toggle mind map board',
     tags: ['guide'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -192,6 +194,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   isDark: false,
   isZen: false,
   isAcademic: false,
+  isSidebarOpen: true,
   panelsCollapsed: false,
   backlinksOpen: true,
   lang: 'en',
@@ -219,6 +222,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   },
   toggleZen: () => set((s) => ({ isZen: !s.isZen })),
   toggleAcademic: () => set((s) => ({ isAcademic: !s.isAcademic })),
+  toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
   togglePanels: () => set((s) => ({ panelsCollapsed: !s.panelsCollapsed })),
   toggleBacklinks: () => set((s) => ({ backlinksOpen: !s.backlinksOpen })),
   toggleLang: () => set((s) => ({ lang: s.lang === 'en' ? 'th' : 'en' })),

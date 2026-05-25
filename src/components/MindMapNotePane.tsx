@@ -84,10 +84,14 @@ export const MindMapNotePane = ({
   return (
     <motion.div
       className={`mm-note-pane${isDark ? ' dark' : ''}`}
-      initial={{ x: '100%', opacity: 0 }}
-      animate={{ x: 0,      opacity: 1 }}
-      exit={{    x: '100%', opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 360, damping: 36 }}
+      initial={{ width: 0, x: 28, opacity: 0 }}
+      animate={{ width: 320, x: 0, opacity: 1 }}
+      exit={{ width: 0, x: 28, opacity: 0 }}
+      transition={{
+        width:   { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+        x:       { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
+        opacity: { duration: 0.18, ease: [0.4, 0, 0.2, 1] },
+      }}
       // Stop the board's onKeyDownCapture from swallowing typing in the editor.
       // Since the board handler checks `notePopupId` and bails, this is
       // defence-in-depth — events still reach the Tiptap editor below us.

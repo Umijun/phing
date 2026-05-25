@@ -38,8 +38,9 @@ export type AppView = 'notes' | 'board';
 const App = () => {
   const {
     isDark,
+    isSidebarOpen,
     panelsCollapsed,
-    togglePanels,
+    toggleSidebar,
     toggleZen,
     toggleAcademic,
     toggleBacklinks,
@@ -266,45 +267,46 @@ const App = () => {
     (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
       if (!meta) return;
+      const key = e.key.toLowerCase();
 
-      if (e.key === 'k') {
+      if (key === 'k') {
         e.preventDefault();
         setPaletteOpen((v) => !v);
         return;
       }
-      if (e.key === 'm' && e.shiftKey) {
+      if (key === 'm' && e.shiftKey) {
         e.preventDefault();
         setView((v) => (v === 'board' ? 'notes' : 'board'));
         return;
       }
+      if (key === 's' && e.shiftKey) {
+        e.preventDefault();
+        toggleSidebar();
+        return;
+      }
       if (view === 'board') return; // board handles its own shortcuts
 
-      if (e.key === 'n' && !e.shiftKey) {
+      if (key === 'n' && !e.shiftKey) {
         e.preventDefault();
         void createNote();
         return;
       }
-      if (e.key === 'z' && e.shiftKey) {
+      if (key === 'z' && e.shiftKey) {
         e.preventDefault();
         toggleZen();
         return;
       }
-      if (e.key === 'a' && e.shiftKey) {
+      if (key === 'a' && e.shiftKey) {
         e.preventDefault();
         toggleAcademic();
         return;
       }
-      if (e.key === 's' && e.shiftKey) {
-        e.preventDefault();
-        togglePanels();
-        return;
-      }
-      if (e.key === 'b' && e.shiftKey) {
+      if (key === 'b' && e.shiftKey) {
         e.preventDefault();
         toggleBacklinks();
         return;
       }
-      if (e.key === 'Backspace' && selectedNoteId) {
+      if (key === 'backspace' && selectedNoteId) {
         e.preventDefault();
         if (pendingDeleteRef.current === selectedNoteId) {
           void deleteNote(selectedNoteId);
@@ -319,12 +321,12 @@ const App = () => {
         }
       }
     },
-    [view, createNote, toggleZen, toggleAcademic, togglePanels, toggleBacklinks, selectedNoteId, deleteNote],
+    [view, createNote, toggleZen, toggleAcademic, toggleSidebar, toggleBacklinks, selectedNoteId, deleteNote],
   );
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [handleKeyDown]);
 
   // ── First-time onboarding ──────────────────────────────────────────────────
@@ -366,18 +368,13 @@ const App = () => {
         background: 'var(--bg)',
       }}
     >
-      {/* Sidebar — always visible */}
+      {/* Main navigation sidebar */}
       <div
-        style={{
-          width: panelsCollapsed ? 0 : 200,
-          minWidth: panelsCollapsed ? 0 : 200,
-          overflow: 'hidden',
-          flexShrink: 0,
-          minHeight: 0,
-          transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1), min-width 0.35s cubic-bezier(0.4,0,0.2,1)',
-        }}
+        className={`app-sidebar-shell ${isSidebarOpen ? 'app-sidebar-shell--open' : 'app-sidebar-shell--closed'}`}
       >
-        <Sidebar view={view} onViewChange={setView} />
+        <div className="app-sidebar-shell__inner">
+          <Sidebar view={view} onViewChange={setView} />
+        </div>
       </div>
 
       {/* Notes view */}

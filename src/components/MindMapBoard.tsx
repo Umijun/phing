@@ -28,7 +28,7 @@ import '@xyflow/react/dist/style.css';
 
 import { useMindMapStore, type MindMapDoc } from '../store/mindMapStore';
 import { useNoteStore, type Pocket } from '../store/noteStore';
-import { calculateLayout, saveMindMapToFile, findNode } from '../lib/mindmap';
+import { calculateLayout, saveMindMapToFile, findNode, type LayoutNode } from '../lib/mindmap';
 import { MindMapNode, type MindMapNodeData } from './MindMapNode';
 import { MindMapNotePane } from './MindMapNotePane';
 
@@ -51,6 +51,19 @@ const MindMapEdge = ({
 
 const nodeTypes: NodeTypes = { mindMapNode: MindMapNode };
 const edgeTypes: EdgeTypes = { mindMapEdge: MindMapEdge };
+const PANEL_TRANSITION_MS = 320;
+
+const nodeCentreY = (node: LayoutNode) => node.y + node.height / 2;
+
+const closestNodeByY = (candidates: LayoutNode[], targetY: number): LayoutNode | null => {
+  if (!candidates.length) return null;
+  return candidates.reduce((closest, node) => {
+    const closestDelta = Math.abs(nodeCentreY(closest) - targetY);
+    const nodeDelta = Math.abs(nodeCentreY(node) - targetY);
+    if (nodeDelta !== closestDelta) return nodeDelta < closestDelta ? node : closest;
+    return nodeCentreY(node) < nodeCentreY(closest) ? node : closest;
+  });
+};
 
 // ─── Mind Map list sidebar ────────────────────────────────────────────────────
 
@@ -435,10 +448,6 @@ const BoardInner = () => {
   const addChild         = useMindMapStore((s) => s.addChild);
   const addSibling       = useMindMapStore((s) => s.addSibling);
   const deleteSelected   = useMindMapStore((s) => s.deleteSelected);
-  const parentId         = useMindMapStore((s) => s.parentId);
-  const firstChildId     = useMindMapStore((s) => s.firstChildId);
-  const prevSiblingId    = useMindMapStore((s) => s.prevSiblingId);
-  const nextSiblingId    = useMindMapStore((s) => s.nextSiblingId);
   const resetBoard       = useMindMapStore((s) => s.resetBoard);
   const openNote         = useMindMapStore((s) => s.openNote);
   const closeNote        = useMindMapStore((s) => s.closeNote);
@@ -450,6 +459,7 @@ const BoardInner = () => {
 
   const pockets = useNoteStore((s) => s.pockets);
   const isDark  = useNoteStore((s) => s.isDark);
+  const isSidebarOpen = useNoteStore((s) => s.isSidebarOpen);
   const { fitView, setCenter } = useReactFlow();
 
   const boardRef            = useRef<HTMLDivElement>(null);
@@ -469,8 +479,14 @@ const BoardInner = () => {
   }, []);
 
   // ── Convert tree → React Flow nodes & edges ───────────────────────────────
+  const layout = useMemo(() => calculateLayout(tree), [tree]);
+
+  const layoutById = useMemo(
+    () => new Map(layout.nodes.map((node) => [node.id, node])),
+    [layout],
+  );
+
   const { nodes, edges } = useMemo<{ nodes: Node[]; edges: Edge[] }>(() => {
-    const layout = calculateLayout(tree);
     return {
       nodes: layout.nodes.map((n) => ({
         id:       n.id,
@@ -500,15 +516,53 @@ const BoardInner = () => {
         targetHandle: e.direction === 'left' ? 'target-right' : 'target-left',
       })),
     };
-  }, [tree, selectedId]);
+  }, [layout, selectedId]);
+
+  const closestVisualChildId = useCallback(
+    (nodeId: string, direction?: 'left' | 'right') => {
+      const parent = layoutById.get(nodeId);
+      if (!parent) return null;
+      const children = layout.nodes.filter((node) =>
+        node.parentId === nodeId && (!direction || node.direction === direction),
+      );
+      return closestNodeByY(children, nodeCentreY(parent))?.id ?? null;
+    },
+    [layout, layoutById],
+  );
+
+  const visualSiblingId = useCallback(
+    (nodeId: string, move: 'up' | 'down') => {
+      const current = layoutById.get(nodeId);
+      if (!current?.parentId) return null;
+
+      const currentY = nodeCentreY(current);
+      const siblings = layout.nodes
+        .filter((node) =>
+          node.parentId === current.parentId &&
+          node.direction === current.direction &&
+          node.id !== nodeId,
+        )
+        .filter((node) => move === 'up'
+          ? nodeCentreY(node) < currentY
+          : nodeCentreY(node) > currentY,
+        )
+        .sort((a, b) => move === 'up'
+          ? nodeCentreY(b) - nodeCentreY(a)
+          : nodeCentreY(a) - nodeCentreY(b),
+        );
+
+      return siblings[0]?.id ?? null;
+    },
+    [layout, layoutById],
+  );
 
   // ── Pan viewport to newly selected node ───────────────────────────────────
   useEffect(() => {
     if (!selectedId) return;
-    const n = calculateLayout(tree).nodes.find((nd) => nd.id === selectedId);
+    const n = layoutById.get(selectedId);
     if (!n) return;
     setCenter(n.x + n.width / 2, n.y + n.height / 2, { duration: 320, zoom: 1 });
-  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedId, layoutById]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Initial fit-view + root selection ─────────────────────────────────────
   useEffect(() => {
@@ -522,6 +576,24 @@ const BoardInner = () => {
     setTimeout(() => fitView({ padding: 0.35, duration: 400 }), 80);
     focusBoard();
   }, [selectedMapId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Keep React Flow centred while side panels animate ─────────────────────
+  useEffect(() => {
+    const startedAt = performance.now();
+    let raf = 0;
+
+    const refitDuringPanelMotion = () => {
+      fitView({ padding: 0.35, duration: 0 });
+      if (performance.now() - startedAt < PANEL_TRANSITION_MS) {
+        raf = requestAnimationFrame(refitDuringPanelMotion);
+      } else {
+        fitView({ padding: 0.35, duration: 180 });
+      }
+    };
+
+    raf = requestAnimationFrame(refitDuringPanelMotion);
+    return () => cancelAnimationFrame(raf);
+  }, [notePopupId, isSidebarOpen, fitView]);
 
   // ── Refocus board after inline label editing ends ─────────────────────────
   // Also sets a brief cooldown so a held Enter key doesn't fire "add sibling"
@@ -551,7 +623,9 @@ const BoardInner = () => {
       // (prevents a held Enter from immediately triggering "add sibling").
       if (editingId || editJustCommittedRef.current) return;
 
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'n') {
+      const shortcutKey = e.key.toLowerCase();
+
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && shortcutKey === 'n') {
         e.preventDefault();
         e.stopPropagation();
         if (notePopupId) closeNote();
@@ -573,23 +647,35 @@ const BoardInner = () => {
           e.preventDefault(); e.stopPropagation(); startEditing(sel); break;
         case 'ArrowRight': {
           e.preventDefault(); e.stopPropagation();
-          const cid = firstChildId(sel);
-          if (cid) setSelected(cid); break;
+          const current = layoutById.get(sel);
+          if (!current) break;
+          const target = current.id === tree.id
+            ? closestVisualChildId(tree.id, 'right')
+            : current.direction === 'left'
+              ? current.parentId
+              : closestVisualChildId(current.id);
+          if (target) setSelected(target); break;
         }
         case 'ArrowLeft': {
           e.preventDefault(); e.stopPropagation();
-          const pid = parentId(sel);
-          if (pid) setSelected(pid); break;
+          const current = layoutById.get(sel);
+          if (!current) break;
+          const target = current.id === tree.id
+            ? closestVisualChildId(tree.id, 'left')
+            : current.direction === 'right'
+              ? current.parentId
+              : closestVisualChildId(current.id);
+          if (target) setSelected(target); break;
         }
         case 'ArrowDown': {
           e.preventDefault(); e.stopPropagation();
-          const nid = nextSiblingId(sel);
+          const nid = visualSiblingId(sel, 'down');
           if (nid) setSelected(nid); break;
         }
         case 'ArrowUp': {
           e.preventDefault(); e.stopPropagation();
-          const pid2 = prevSiblingId(sel);
-          if (pid2) setSelected(pid2); break;
+          const nid = visualSiblingId(sel, 'up');
+          if (nid) setSelected(nid); break;
         }
         case 'Delete':
         case 'Backspace':
@@ -600,7 +686,7 @@ const BoardInner = () => {
     [
       editingId, selectedId, notePopupId,
       addChild, addSibling, startEditing,
-      firstChildId, parentId, prevSiblingId, nextSiblingId,
+      tree.id, layoutById, closestVisualChildId, visualSiblingId,
       deleteSelected, setSelected, openNote, closeNote,
     ],
   );
@@ -608,7 +694,7 @@ const BoardInner = () => {
   // ── Resolve note-pane data ─────────────────────────────────────────────────
   const notePaneNode  = notePopupId ? findNode(tree, notePopupId) : null;
   const notePaneLabel = notePopupId
-    ? (calculateLayout(tree).nodes.find((nd) => nd.id === notePopupId)?.label ?? notePopupId)
+    ? (layoutById.get(notePopupId)?.label ?? notePopupId)
     : '';
 
   // ── Active map title for toolbar ──────────────────────────────────────────
