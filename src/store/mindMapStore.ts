@@ -63,6 +63,36 @@ function makeDoc(title = 'Mind Map', folder = ''): MindMapDoc {
   };
 }
 
+// ── Per-document undo / redo stacks ───────────────────────────────────────────
+// Keyed by MindMapDoc.id so each document has independent history.
+// Stacks hold snapshots of the tree and the node-selection state taken
+// immediately *before* a mutation, so that undo restores exactly the pre-op
+// state.  The redo stack is populated by undo operations and cleared whenever a
+// new forward mutation arrives.
+
+interface UndoEntry {
+  tree:       MindMapNode;
+  selectedId: string | null;
+}
+
+const undoStacks = new Map<string, UndoEntry[]>();
+const redoStacks = new Map<string, UndoEntry[]>();
+
+/** Maximum number of undo steps retained per document. */
+const MAX_UNDO = 50;
+
+/**
+ * Push the current tree + selection snapshot onto the undo stack for `docId`,
+ * then clear the redo stack (any new mutation invalidates the redo history).
+ */
+function pushUndo(docId: string, tree: MindMapNode, selectedId: string | null): void {
+  const stack = undoStacks.get(docId) ?? [];
+  stack.push({ tree, selectedId });
+  if (stack.length > MAX_UNDO) stack.shift(); // evict oldest
+  undoStacks.set(docId, stack);
+  redoStacks.delete(docId); // new action invalidates redo
+}
+
 // ── Debounced auto-save ────────────────────────────────────────────────────────
 
 const saveTimers    = new Map<string, ReturnType<typeof setTimeout>>();
@@ -145,6 +175,10 @@ export interface MindMapStore {
   addSibling:     (nodeId: string)   => string;
   deleteSelected: ()                 => void;
   resetBoard:     (label?: string)   => void;
+
+  // ── Undo / redo ──────────────────────────────────────────────────────────
+  undo: () => void;
+  redo: () => void;
 
   // ── Navigation helpers ───────────────────────────────────────────────────
   parentId:      (nodeId: string) => string | null;
@@ -256,6 +290,9 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
         console.error('[phing] deleteMindMap failed', e),
       );
     }
+    // Release history memory for the deleted doc.
+    undoStacks.delete(id);
+    redoStacks.delete(id);
     set((s) => {
       const remaining = s.mindMaps.filter((d) => d.id !== id);
 
@@ -330,8 +367,13 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
   startEditing: (id) => set({ selectedId: id, editingId: id }),
 
   commitEdit: (id, label) => {
-    const trimmed              = label.trim() || 'New node';
-    const { selectedMindMapId } = get();
+    const trimmed                          = label.trim() || 'New node';
+    const { selectedMindMapId, selectedId } = get();
+
+    // Snapshot before overwriting the label so undo can restore it.
+    if (selectedMindMapId) {
+      pushUndo(selectedMindMapId, get().activeTree(), selectedId);
+    }
 
     set((s) => ({
       mindMaps: patchSelectedTree(s.mindMaps, selectedMindMapId, (tree) =>
@@ -363,8 +405,12 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
   // ── Mutations ─────────────────────────────────────────────────────────────
 
   addChild: (parentId) => {
-    const node                 = mkNode();
-    const { selectedMindMapId } = get();
+    const node                             = mkNode();
+    const { selectedMindMapId, selectedId } = get();
+
+    if (selectedMindMapId) {
+      pushUndo(selectedMindMapId, get().activeTree(), selectedId);
+    }
 
     set((s) => ({
       mindMaps: patchSelectedTree(s.mindMaps, selectedMindMapId, (tree) =>
@@ -380,10 +426,14 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
   },
 
   addSibling: (nodeId) => {
-    const { selectedMindMapId } = get();
+    const { selectedMindMapId, selectedId } = get();
     const tree = get().activeTree();
     const parent = findParent(tree, nodeId);
     if (!parent) return get().addChild(nodeId); // root → add child instead
+
+    if (selectedMindMapId) {
+      pushUndo(selectedMindMapId, tree, selectedId);
+    }
 
     const node = mkNode();
 
@@ -405,6 +455,10 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
     const tree = get().activeTree();
     if (!selectedId || selectedId === tree.id) return;
 
+    if (selectedMindMapId) {
+      pushUndo(selectedMindMapId, tree, selectedId);
+    }
+
     const parent = findParent(tree, selectedId);
 
     set((s) => ({
@@ -420,7 +474,10 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
   },
 
   resetBoard: (label) => {
-    const { selectedMindMapId } = get();
+    const { selectedMindMapId, selectedId } = get();
+    if (selectedMindMapId) {
+      pushUndo(selectedMindMapId, get().activeTree(), selectedId);
+    }
     const root = makeRoot(label ?? 'Mind Map');
 
     set((s) => ({
@@ -430,6 +487,73 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
           : doc,
       ),
       selectedId: root.id,
+      editingId:  null,
+    }));
+
+    const doc = get().mindMaps.find((d) => d.id === selectedMindMapId);
+    if (doc) scheduleSave(doc);
+  },
+
+  // ── Undo / redo ───────────────────────────────────────────────────────────
+
+  undo: () => {
+    const { selectedMindMapId, selectedId } = get();
+    if (!selectedMindMapId) return;
+    const stack = undoStacks.get(selectedMindMapId);
+    if (!stack?.length) return;
+
+    const entry = stack.pop()!;
+
+    // Push current state to redo
+    const redo = redoStacks.get(selectedMindMapId) ?? [];
+    redo.push({ tree: get().activeTree(), selectedId });
+    redoStacks.set(selectedMindMapId, redo);
+
+    // Restore — guard the selectedId in case the node no longer exists
+    const restoredSelected =
+      entry.selectedId && findNode(entry.tree, entry.selectedId)
+        ? entry.selectedId
+        : entry.tree.id; // fall back to root
+
+    set((s) => ({
+      mindMaps: s.mindMaps.map((doc) =>
+        doc.id === selectedMindMapId
+          ? { ...doc, tree: entry.tree, updatedAt: new Date().toISOString() }
+          : doc,
+      ),
+      selectedId: restoredSelected,
+      editingId:  null,
+    }));
+
+    const doc = get().mindMaps.find((d) => d.id === selectedMindMapId);
+    if (doc) scheduleSave(doc);
+  },
+
+  redo: () => {
+    const { selectedMindMapId, selectedId } = get();
+    if (!selectedMindMapId) return;
+    const stack = redoStacks.get(selectedMindMapId);
+    if (!stack?.length) return;
+
+    const entry = stack.pop()!;
+
+    // Push current state to undo
+    const undo = undoStacks.get(selectedMindMapId) ?? [];
+    undo.push({ tree: get().activeTree(), selectedId });
+    undoStacks.set(selectedMindMapId, undo);
+
+    const restoredSelected =
+      entry.selectedId && findNode(entry.tree, entry.selectedId)
+        ? entry.selectedId
+        : entry.tree.id;
+
+    set((s) => ({
+      mindMaps: s.mindMaps.map((doc) =>
+        doc.id === selectedMindMapId
+          ? { ...doc, tree: entry.tree, updatedAt: new Date().toISOString() }
+          : doc,
+      ),
+      selectedId: restoredSelected,
       editingId:  null,
     }));
 

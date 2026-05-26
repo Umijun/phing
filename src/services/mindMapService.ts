@@ -15,6 +15,7 @@
  */
 
 import {
+  exists,
   mkdir,
   readDir,
   readTextFile,
@@ -23,6 +24,7 @@ import {
   remove,
 } from '@tauri-apps/plugin-fs';
 import type { MindMapNode } from '../lib/mindmap';
+import { captureSnapshot } from '../lib/recoveryJournal';
 
 // ── Public document type ───────────────────────────────────────────────────────
 
@@ -97,6 +99,21 @@ export async function saveMindMapDoc(
   const updated: MindMapDoc = { ...doc, updatedAt: new Date().toISOString() };
   const finalPath = docPath(vaultPath, doc.id);
   const tmpPath   = `${finalPath}.tmp`;
+
+  // ── Snapshot existing disk content before overwriting ─────────────────────
+  // Mirrors the pattern in atomicWriteNote so a Reset or bulk-edit can be
+  // recovered from .phing/snapshots/ if the user accidentally destroys the map.
+  if (await exists(finalPath)) {
+    try {
+      const existing = await readTextFile(finalPath);
+      const relPath  = `${MM_DIR}/${doc.id}.json`;
+      await captureSnapshot(vaultPath, relPath, existing);
+    } catch {
+      // Non-fatal — snapshot failure must not block the save.
+    }
+  }
+
+  // ── Atomic write: .tmp → final ────────────────────────────────────────────
   // Write to a temp file first, then atomically rename over the final path.
   // Mirrors the pattern used by noteStore so a crash mid-write never
   // leaves a truncated or partially-written JSON file.

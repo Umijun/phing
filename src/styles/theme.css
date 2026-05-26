@@ -2540,6 +2540,12 @@ textarea,
   background: var(--primary-s);
   color:      var(--primary);
 }
+.conflict-btn--danger {
+  background:  var(--danger, #e05252);
+  color:       #fff;
+  font-weight: 600;
+}
+.conflict-btn--danger:hover { opacity: 0.88; }
 
 /* ══════════════════════════════════════════════════════════
    EMOJI PICKER

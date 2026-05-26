@@ -89,8 +89,10 @@ async function pruneSnapshots(snapshotDir: string, prefix: string): Promise<void
 // ── Orphan recovery ───────────────────────────────────────────────────────────
 
 /**
- * Walks the vault recursively and returns absolute paths of any `.md.tmp`
- * files left behind by a previous crash mid-atomic-write.
+ * Walks the vault recursively and returns absolute paths of any `.md.tmp` or
+ * `.json.tmp` files left behind by a previous crash mid-atomic-write.
+ * Both note files (Markdown) and mind-map documents (JSON) use the same
+ * write-to-tmp-then-rename pattern, so both extensions are scanned.
  */
 export async function findOrphanedTmpFiles(vaultPath: string): Promise<string[]> {
   const orphans: string[] = [];
@@ -110,7 +112,10 @@ async function collectTmpFiles(dir: string, out: string[]): Promise<void> {
     const abs = joinPath(dir, entry.name);
     if (entry.isDirectory) {
       await collectTmpFiles(abs, out);
-    } else if (entry.isFile && entry.name.endsWith('.md.tmp')) {
+    } else if (
+      entry.isFile &&
+      (entry.name.endsWith('.md.tmp') || entry.name.endsWith('.json.tmp'))
+    ) {
       out.push(abs);
     }
   }

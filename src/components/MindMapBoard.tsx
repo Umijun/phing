@@ -36,6 +36,7 @@ import { ghostX, ghostY, useNoteDrag } from '../lib/noteDrag';
 import { useVaultStore } from '../store/vaultStore';
 import { relPath } from '../lib/fileTree';
 import { pocketGlow, POCKET_COLORS } from '../lib/pockets';
+import ConfirmDialogue from './ConfirmDialogue';
 
 // ─── Custom bezier edge ──────────────────────────────────────────────────────
 
@@ -530,6 +531,8 @@ const BoardInner = () => {
   const addSibling       = useMindMapStore((s) => s.addSibling);
   const deleteSelected   = useMindMapStore((s) => s.deleteSelected);
   const resetBoard       = useMindMapStore((s) => s.resetBoard);
+  const undo             = useMindMapStore((s) => s.undo);
+  const redo             = useMindMapStore((s) => s.redo);
   const openNote         = useMindMapStore((s) => s.openNote);
   const closeNote        = useMindMapStore((s) => s.closeNote);
   const updateNote       = useMindMapStore((s) => s.updateNote);
@@ -561,6 +564,7 @@ const BoardInner = () => {
 
   const [pocketFilter,    setPocketFilter]    = useState<string>('*');
   const [isPdfExporting,  setIsPdfExporting]  = useState(false);
+  const [confirmReset,    setConfirmReset]    = useState(false);
 
   // ── Live pocket list ──────────────────────────────────────────────────────────
   // When a vault is open, derive the pocket list directly from vaultTree so that
@@ -750,6 +754,21 @@ const BoardInner = () => {
 
       const shortcutKey = e.key.toLowerCase();
 
+      // Undo / redo — handled before the note-popup bail so they work
+      // even while the note pane is open (the pane manages its own text undo).
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && shortcutKey === 'z') {
+        e.preventDefault();
+        e.stopPropagation();
+        undo();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && shortcutKey === 'z') {
+        e.preventDefault();
+        e.stopPropagation();
+        redo();
+        return;
+      }
+
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && shortcutKey === 'n') {
         e.preventDefault();
         e.stopPropagation();
@@ -813,6 +832,7 @@ const BoardInner = () => {
       addChild, addSibling, startEditing,
       tree.id, layoutById, closestVisualChildId, visualSiblingId,
       deleteSelected, setSelected, openNote, closeNote,
+      undo, redo,
     ],
   );
 
@@ -916,7 +936,7 @@ const BoardInner = () => {
               💭 note
             </MmBtn>
             <div className="mm-toolbar__sep" />
-            <MmBtn onClick={() => { resetBoard(); focusBoard(); }} title="Clear board">↺ reset</MmBtn>
+            <MmBtn onClick={() => setConfirmReset(true)} title="Clear board">↺ reset</MmBtn>
             <MmBtn onClick={() => void saveMindMapToFile(tree)} title="Export Markdown" primary>↓ export</MmBtn>
             <MmBtn
               onClick={() => void handleMindMapPdfExport()}
@@ -994,6 +1014,17 @@ const BoardInner = () => {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* ── Reset confirmation guard ─────────────────────────────────────────── */}
+      <ConfirmDialogue
+        open={confirmReset}
+        title='Reset board?'
+        message={`This will erase all nodes on "${activeMapTitle}". The action cannot be undone.`}
+        confirmLabel='Yes, reset'
+        danger
+        onConfirm={() => { resetBoard(); focusBoard(); setConfirmReset(false); }}
+        onCancel={() => setConfirmReset(false)}
+      />
     </div>
   );
 };
