@@ -3,6 +3,8 @@ import type { Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+// All four table extensions are re-exported from the single table package.
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { Markdown } from '@tiptap/markdown';
 import { HeadingMarkerDecorations } from '../extensions/headingMarkers';
 import { SyntaxMarkers } from '../extensions/syntaxMarkers';
@@ -26,6 +28,12 @@ export function createEditorExtensions(getWikiItems?: GetWikiLinkItems): Extensi
     ZenModeExtension,
     PhingKeyboard,
     Underline,
+    // Table support — resizable handles are disabled to preserve the calm
+    // aesthetic; GFM serialisation is handled automatically by @tiptap/markdown.
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableCell,
+    TableHeader,
     Placeholder.configure({ placeholder: 'Begin writing...' }),
     Markdown.configure({
       markedOptions: { gfm: true, breaks: false },

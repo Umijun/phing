@@ -24,14 +24,34 @@ const parseCursor = (fm: string): NoteCursor | undefined => {
   return { anchor: a, head: h };
 };
 
-/** Strip legacy H1 / italic description from body markdown (pre-unification notes). */
+/**
+ * Strip legacy H1 / italic description from body markdown (pre-unification notes).
+ *
+ * The legacy format stored `# Title\n\n*italic description*` as the first two
+ * elements of the note body before frontmatter unified those fields into YAML.
+ *
+ * IMPORTANT: only strips when BOTH markers are present.  A lone `# Heading` at
+ * the start of a modern frontmatter note is valid user content and must not be
+ * touched.  Requiring the italic description line as confirmation prevents the
+ * function from silently eating user-written H1s on every vault reload.
+ */
 export function stripLegacyBody(md: string): string {
   const lines = md.split('\n');
-  let i = 0;
-  if (lines[i]?.startsWith('# ')) i++;
-  while (i < lines.length && lines[i]?.trim() === '') i++;
-  if (lines[i]?.match(/^\*[^*].+[^*]\*$/)) i++;
-  while (i < lines.length && lines[i]?.trim() === '') i++;
+
+  // Fast-path: no leading # means this is definitely a modern note body.
+  if (!lines[0]?.startsWith('# ')) return md;
+
+  // Peek ahead past blank lines for the italic description line.
+  // Only commit to stripping if we find it — that's the legacy signature.
+  let j = 1;
+  while (j < lines.length && lines[j]?.trim() === '') j++;
+  if (!lines[j]?.match(/^\*[^*].+[^*]\*$/)) return md;
+
+  // Both legacy markers confirmed — strip them and any surrounding blank lines.
+  let i = 1;                                               // skip the # line
+  while (i < lines.length && lines[i]?.trim() === '') i++; // skip blanks
+  i++;                                                      // skip the *italic* line
+  while (i < lines.length && lines[i]?.trim() === '') i++; // skip trailing blanks
   return lines.slice(i).join('\n');
 }
 
