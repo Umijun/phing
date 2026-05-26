@@ -1830,6 +1830,35 @@ textarea,
   @page { size: A4; margin: 2cm; }
 }
 
+/* ── PDF html2canvas export mode ────────────────────────────────────────────
+   .pdf-export-mode is injected onto <html> inside html2canvas's onclone
+   callback (see pdfExport.ts).  It is NEVER present in the live document.
+
+   Primary dark-mode fix:
+     buildCloneStyle() now reads CSS custom-property values directly from the
+     :root CSSStyleRule (light-mode defaults) instead of getComputedStyle(),
+     which previously returned the active dark-palette values and baked them
+     into the cloned :root — producing near-white text on a white canvas.
+     The rules below are the belt-and-braces layer for any element whose
+     colour still resolves to a dark variable.
+
+   Emoji fix:
+     Each .emoji-trigger <button> is replaced with a <span.pdf-emoji-placeholder>
+     in the onclone callback so html2canvas never encounters the native OS
+     button paint path or the SBIX/COLR Color Emoji glyph tables — both of
+     which produce the broken-image placeholder in the canvas 2D API.          */
+
+.pdf-emoji-placeholder {
+  font-size:    22px;
+  line-height:  1;
+  display:      inline-block;
+  margin-right: 6px;
+  /* Rendered as a plain <span>, the emoji resolves through the page font
+     stack (Lora → Georgia → serif → system fallback) rather than Apple Color
+     Emoji, which html2canvas cannot rasterise.  The glyph may be monochrome
+     but it will always be legible rather than broken.                         */
+}
+
 /* ═══════════════════════════════════════════════════════════
    MIND MAP BOARD
    ═══════════════════════════════════════════════════════════ */

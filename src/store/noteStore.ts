@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { stripLegacyBody } from '../lib/frontmatter';
 import {
   loadPockets,
@@ -266,7 +267,9 @@ const initialVaultPath =
 /** Dev fallback only — never used when a vault path is configured. */
 const useSampleData = !initialVaultPath;
 
-export const useNoteStore = create<NoteStore>((set, get) => ({
+export const useNoteStore = create<NoteStore>()(
+  persist(
+    (set, get) => ({
   notes: useSampleData ? SAMPLE_NOTES : [],
   pockets: loadPockets(),
   profile: loadProfile(),
@@ -974,4 +977,27 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       console.error('[phing] moveNote failed', e);
     }
   },
-}));
+  }),
+  {
+    name: 'phing_ui_prefs',
+
+    // CRITICAL: only persist cosmetic UI toggles.  Every other field in
+    // NoteStore is either highly transient (syncState, dirtyNoteIds, notes,
+    // vaultTree) or re-derived on vault load.  Persisting them would cause
+    // the write-queue / sync state machine to boot with stale data and break.
+    partialize: (state) => ({
+      isDark:     state.isDark,
+      isAcademic: state.isAcademic,
+    }),
+
+    // Re-apply the .dark CSS class on first paint after the store is hydrated
+    // from localStorage.  Without this, isDark: true would be in the store
+    // but the `.dark` class would be absent from <html> until the user toggled
+    // it manually — causing a flash of light mode on every dark-mode launch.
+    onRehydrateStorage: () => (state) => {
+      if (state?.isDark) {
+        document.documentElement.classList.add('dark');
+      }
+    },
+  },
+));

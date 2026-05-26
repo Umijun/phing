@@ -76,18 +76,29 @@ const SCALE = 2;
  *    animations are killed so the snapshot is always a crisp still.
  */
 function buildCloneStyle(doc: Document): HTMLStyleElement {
-  const liveStyle = getComputedStyle(document.documentElement);
-
-  // Enumerate every --* property declared in any :root rule across all live
-  // stylesheets (Vite inlines them as <style> tags so they are enumerable).
-  const allVarNames = new Set<string>();
+  // Read CSS custom-property values directly from the :root CSSStyleRule
+  // declaration blocks — NOT from getComputedStyle(document.documentElement).
+  //
+  // The distinction matters in dark mode: getComputedStyle resolves the
+  // *active* cascade, so every --text, --h1, --strong etc. comes back as the
+  // dark-palette value (near-white).  Those values then get baked into the
+  // cloned :root, the white canvas background is applied, and the result is
+  // invisible light-grey text on white paper.
+  //
+  // Reading from rule.style.getPropertyValue() skips the .dark {} overrides
+  // entirely and always returns the light-mode defaults from :root — which is
+  // exactly what we want for a printed document.
+  const rootVarValues = new Map<string, string>();
   for (const sheet of Array.from(document.styleSheets)) {
     try {
       for (const rule of Array.from(sheet.cssRules)) {
         if (rule instanceof CSSStyleRule && rule.selectorText === ':root') {
           for (let i = 0; i < rule.style.length; i++) {
             const prop = rule.style.item(i);
-            if (prop.startsWith('--')) allVarNames.add(prop);
+            if (prop.startsWith('--')) {
+              const val = rule.style.getPropertyValue(prop).trim();
+              if (val) rootVarValues.set(prop, val);
+            }
           }
         }
       }
@@ -96,13 +107,8 @@ function buildCloneStyle(doc: Document): HTMLStyleElement {
     }
   }
 
-  // Map each variable to its current computed concrete value (not a var() ref).
-  const declarations = [...allVarNames]
-    .map((p) => {
-      const val = liveStyle.getPropertyValue(p).trim();
-      return val ? `${p}: ${val}` : null;
-    })
-    .filter((d): d is string => d !== null)
+  const declarations = [...rootVarValues.entries()]
+    .map(([p, v]) => `${p}: ${v}`)
     .join(';\n  ');
 
   const style = doc.createElement('style');
@@ -203,6 +209,30 @@ function buildCloneStyle(doc: Document): HTMLStyleElement {
     .phing-editor {
       font-family: "Lora", Georgia, serif !important;
     }
+
+    /* ── 6. pdf-export-mode — belt-and-braces dark text (dark-mode safety net) ─
+       The primary fix is that CSS custom properties are now read from the static
+       :root CSSStyleRule (light-mode values) rather than from getComputedStyle
+       (which returns dark-mode values when .dark is active on <html>).  These
+       rules are an explicit override layer so that any element whose colour
+       still references a resolved dark variable cannot produce light-on-white
+       output.  The class is toggled on <html> in the onclone callback below.   */
+    .pdf-export-mode .phing-editor,
+    .pdf-export-mode .editor-surface   { color: #1a1a1a !important; }
+    .pdf-export-mode .phing-editor h1  { color: #2a2230 !important; }
+    .pdf-export-mode .phing-editor h2  { color: #5a3a8a !important; }
+    .pdf-export-mode .phing-editor h3  { color: #7b5ea7 !important; }
+    .pdf-export-mode .phing-editor h4  { color: #c94f4f !important; }
+    .pdf-export-mode .phing-editor h5  { color: #9a7aaa !important; }
+    .pdf-export-mode .phing-editor p,
+    .pdf-export-mode .phing-editor li,
+    .pdf-export-mode .phing-editor blockquote,
+    .pdf-export-mode .phing-editor td,
+    .pdf-export-mode .phing-editor th  { color: #1a1a1a !important; }
+    .pdf-export-mode .phing-editor a   { color: #5a3a8a !important; }
+    .pdf-export-mode .editor-meta      { color: #888888 !important; }
+    .pdf-export-mode .editor-title     { color: #2a2230 !important; }
+    .pdf-export-mode .editor-desc      { color: #555555 !important; }
   `;
   return style;
 }
@@ -276,10 +306,33 @@ export async function exportToPdf(
     fullCanvas = await html2canvas(surfaceEl, {
       scale:           SCALE,
       useCORS:         true,
-      allowTaint:      false,
+      allowTaint:      true,
       logging:         false,
       backgroundColor: '#ffffff',
       onclone: (doc) => {
+        // (a) Strip .dark so the cloned stylesheet's :root variables (light
+        //     palette) win the cascade rather than the .dark {} overrides.
+        doc.documentElement.classList.remove('dark');
+
+        // (b) Add .pdf-export-mode so the colour-override rules in
+        //     buildCloneStyle's injected <style> activate.
+        doc.documentElement.classList.add('pdf-export-mode');
+
+        // (c) Replace every .emoji-trigger <button> with a plain <span>.
+        //     html2canvas has two problems with the trigger as-is:
+        //       • The OS renders <button> via native theming (UA stylesheet),
+        //         and that native layer is not accessible to the 2D canvas
+        //         text API — result: broken-image placeholder on macOS WebKit.
+        //       • Apple Color Emoji uses SBIX/COLR glyph tables that the
+        //         canvas drawText path cannot rasterise — same broken icon.
+        //     A plain <span> with identical text content avoids both paths.
+        doc.querySelectorAll<HTMLElement>('.emoji-trigger').forEach((btn) => {
+          const span       = doc.createElement('span');
+          span.className   = 'pdf-emoji-placeholder';
+          span.textContent = btn.textContent;
+          btn.replaceWith(span);
+        });
+
         doc.head.appendChild(buildCloneStyle(doc));
       },
     });
@@ -373,10 +426,12 @@ export async function exportMindMapToPdf(
   const canvas = await html2canvas(canvasEl, {
     scale:           SCALE,
     useCORS:         true,
-    allowTaint:      false,
+    allowTaint:      true,
     logging:         false,
     backgroundColor: '#ffffff',
     onclone: (doc) => {
+      doc.documentElement.classList.remove('dark');
+      doc.documentElement.classList.add('pdf-export-mode');
       doc.head.appendChild(buildCloneStyle(doc));
     },
   });
