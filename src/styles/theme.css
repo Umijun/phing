@@ -725,14 +725,20 @@ textarea,
   transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
-.phing-editor .ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  color: var(--soft);
-  font-style: italic;
-  font-family: var(--font-serif);
+/* Slash-command discovery hint — shown on every empty paragraph, not just
+   the first-child empty-editor state.  Uses the UI font (not serif) and a
+   very low-weight colour so it whispers rather than shouts.                  */
+.phing-editor .ProseMirror p.is-empty::before {
+  content:        attr(data-placeholder);
+  color:          var(--soft);
+  font-family:    var(--font-ui);
+  font-size:      0.9em;
+  font-style:     normal;
+  font-weight:    400;
+  opacity:        0.55;
   pointer-events: none;
-  float: left;
-  height: 0;
+  float:          left;
+  height:         0;
 }
 
 .phing-editor strong { font-weight: 700; color: var(--strong); }
@@ -916,6 +922,20 @@ textarea,
   color: var(--muted);
   font-style: italic;
 }
+
+/* ── Slash Command menu (tippy.js portal) ────────────────────────────────────
+   The SlashMenu React component is appended to <body> by tippy.js, so these
+   rules must live at the root level rather than inside a scoped selector.
+   Scrollbar styling mirrors Phing's global thin-scrollbar aesthetic.          */
+
+/* Tippy box reset — prevent tippy's default theming from fighting our styles */
+.tippy-box[data-theme~='slash'] { background: none; box-shadow: none; }
+.tippy-box[data-theme~='slash'] > .tippy-content { padding: 0; }
+
+/* Thin scrollbar inside the menu panel (WebKit) */
+[data-slash-menu]::-webkit-scrollbar       { width: 3px; }
+[data-slash-menu]::-webkit-scrollbar-track { background: transparent; }
+[data-slash-menu]::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
 
 /* ── Tables ──────────────────────────────────────────────────────────────────
    GFM tables rendered by @tiptap/markdown + the four Table extensions.
@@ -1286,7 +1306,6 @@ textarea,
 }
 
 .editor-chrome-bar,
-.editor-toolbar,
 .editor-status-bar,
 .editor-find-bar {
   font-family: var(--font-ui);
@@ -2085,7 +2104,7 @@ textarea,
 /* Root node — solid taro anchor, prominent */
 .mm-node--root {
   padding: 13px 24px;
-  border-radius: 32px;
+  border-radius: 24px;
   background: rgba(203, 170, 203, 0.48);
   border-color: rgba(203, 170, 203, 0.72);
   box-shadow:
@@ -2103,22 +2122,25 @@ textarea,
     0 2px 8px rgba(0, 0, 0, 0.32);
 }
 
-/* Level-1 children — tinted with their branch pastel colour */
+/* Level-1 children — primary ghost fill; branch colour preserved on border
+   so each category retains its colour-identity signal at the stroke level. */
 .mm-node--l1 {
-  background:   rgba(var(--node-branch-rgb, 203, 170, 203), 0.10);
+  background:   var(--primary-s);
   border-color: rgba(var(--node-branch-rgb, 203, 170, 203), 0.65);
 }
 
 .dark .mm-node--l1 {
-  background:   rgba(var(--node-branch-rgb, 174, 198, 207), 0.12);
+  background:   var(--primary-s);
   border-color: rgba(var(--node-branch-rgb, 174, 198, 207), 0.48);
 }
 
-/* Level 2+ — minimal outline only, lighter weight; branch colour at low opacity */
+/* Level 2+ — transparent fill so leaves recede visually; branch colour at
+   the border keeps them anchored to their branch without competing with the
+   root and L1 nodes for visual weight.                                      */
 .mm-node--deep {
   padding: 7px 12px;
-  border-radius: 18px;
-  background:   rgba(var(--node-branch-rgb, 203, 170, 203), 0.06);
+  border-radius: 24px;
+  background:   transparent;
   border-color: rgba(var(--node-branch-rgb, 203, 170, 203), 0.28);
   box-shadow: 0 1px 4px rgba(var(--node-branch-rgb, 203, 170, 203), 0.07);
   backdrop-filter: blur(6px);
@@ -2126,7 +2148,7 @@ textarea,
 }
 
 .dark .mm-node--deep {
-  background:   rgba(var(--node-branch-rgb, 174, 198, 207), 0.06);
+  background:   transparent;
   border-color: rgba(var(--node-branch-rgb, 174, 198, 207), 0.18);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
@@ -2567,14 +2589,14 @@ textarea,
 
 .mm-node--root .mm-node-label {
   font-family:    var(--font-serif);
-  font-size:      15px;
+  font-size:      16px;
   font-weight:    700;
   letter-spacing: -0.2px;
   line-height:    1.25;
 }
 
 .mm-node--l1 .mm-node-label {
-  font-size:   12px;
+  font-size:   13px;
   font-weight: 600;
 }
 

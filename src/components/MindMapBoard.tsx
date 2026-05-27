@@ -49,7 +49,7 @@ const MindMapEdge = ({
   const edgeData    = data as { depth?: number; branchIndex?: number } | undefined;
   const depth       = edgeData?.depth ?? 1;
   const branchIndex = edgeData?.branchIndex ?? -1;
-  const strokeWidth = depth <= 1 ? 2.0 : depth === 2 ? 1.4 : 1.0;
+  const strokeWidth = depth <= 1 ? 2.5 : depth === 2 ? 1.5 : 1.0;
   const opacity     = depth <= 1 ? 0.42 : depth === 2 ? 0.35 : 0.28;
   // Use the branch colour when available; fall back to the taro primary.
   const strokeColor = branchIndex >= 0

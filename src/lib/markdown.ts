@@ -13,6 +13,7 @@ import { PhingKeyboard } from '../extensions/phingKeyboard';
 import { SyntaxVisibility } from '../extensions/syntaxVisibility';
 import { ZenModeExtension } from '../extensions/zenMode';
 import { WikiLink, type WikiLinkItem } from '../extensions/wikiLink';
+import { SlashCommand } from '../extensions/slashCommand';
 import type { NoteCursor } from '../store/noteStore';
 import { stripLegacyBody } from './frontmatter';
 
@@ -34,13 +35,15 @@ export function createEditorExtensions(getWikiItems?: GetWikiLinkItems): Extensi
     TableRow,
     TableCell,
     TableHeader,
-    Placeholder.configure({ placeholder: 'Begin writing...' }),
+    Placeholder.configure({ placeholder: "Type '/' for commands" }),
     Markdown.configure({
       markedOptions: { gfm: true, breaks: false },
     }),
     WikiLink.configure({
       getItems: getWikiItems ?? (() => []),
     }),
+    // Slash Command menu — triggered by '/' at line start or after a space.
+    SlashCommand,
   ];
 }
 

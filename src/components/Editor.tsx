@@ -141,11 +141,6 @@ const Editor = ({ onOpenPalette }: EditorProps) => {
   const [localTitle, setLocalTitle] = useState('');
   const [localDesc, setLocalDesc] = useState('');
 
-  // Movable toolbar
-  const [toolbarOffset, setToolbarOffset] = useState({ x: 0, y: 0 });
-  const [isDraggingToolbar, setIsDraggingToolbar] = useState(false);
-  const toolbarDragRef = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null);
-
   // Collapsible TOC panel (open/closed)
   const [tocOpen, setTocOpen] = useState(true);
   // Set of flatIndex values whose children are currently collapsed
@@ -277,20 +272,6 @@ const Editor = ({ onOpenPalette }: EditorProps) => {
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, []);
-
-  useEffect(() => {
-    if (!isDraggingToolbar) return;
-    const onMove = (e: MouseEvent) => {
-      if (!toolbarDragRef.current) return;
-      const dx = e.clientX - toolbarDragRef.current.mx;
-      const dy = e.clientY - toolbarDragRef.current.my;
-      setToolbarOffset({ x: toolbarDragRef.current.ox + dx, y: toolbarDragRef.current.oy + dy });
-    };
-    const onUp = () => { setIsDraggingToolbar(false); toolbarDragRef.current = null; };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, [isDraggingToolbar]);
 
   // ── Backlinks — depend on stable IDs to avoid stale-closure glitches ────────
   // Using selectedNoteId (a primitive) instead of `note` (a new object reference
@@ -442,19 +423,23 @@ const Editor = ({ onOpenPalette }: EditorProps) => {
           background: 'var(--bg)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)' }}>
-          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>Phing</span>
+        {/* Breadcrumb — flex: 1 + minWidth: 0 lets it shrink and truncate
+            before the right-side utility buttons are ever affected.           */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)', flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <span style={{ fontWeight: 600, color: 'var(--primary)', flexShrink: 0 }}>Phing</span>
           {pocket && (
             <>
-              <span>/</span>
-              <span>{pocket.name}</span>
+              <span style={{ flexShrink: 0 }}>/</span>
+              <span style={{ flexShrink: 0 }}>{pocket.name}</span>
             </>
           )}
-          <span>/</span>
-          <span style={{ color: 'var(--strong)', fontWeight: 500 }}>{localTitle || note.title}</span>
-          <span style={{ marginLeft: 8, color: 'var(--primary)', fontSize: 10 }}>{saveLabel}</span>
+          <span style={{ flexShrink: 0 }}>/</span>
+          <span style={{ color: 'var(--strong)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{localTitle || note.title}</span>
+          <span style={{ marginLeft: 8, color: 'var(--primary)', fontSize: 10, flexShrink: 0 }}>{saveLabel}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11 }}>
+        {/* Utility buttons — flexShrink: 0 keeps them at their natural width
+            regardless of how narrow the window becomes.                       */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, flexShrink: 0 }}>
           <motion.span
             whileHover={{ color: 'var(--primary)' }}
             onClick={() => {
@@ -596,73 +581,6 @@ const Editor = ({ onOpenPalette }: EditorProps) => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div
-        className="editor-toolbar"
-        style={{
-          position: 'absolute',
-          top: (findOpen ? 90 : 46) + toolbarOffset.y,
-          left: `calc(50% + ${toolbarOffset.x}px)`,
-          transform: 'translateX(-50%)',
-          background: 'var(--card)',
-          border: '0.5px solid var(--border)',
-          borderRadius: 100,
-          padding: '5px 10px 5px 8px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          boxShadow: '0 4px 20px var(--primary-g)',
-          zIndex: 10,
-          backdropFilter: 'blur(12px)',
-          userSelect: 'none',
-        }}
-      >
-        {/* Drag handle */}
-        <span
-          title="Drag to move · double-click to reset"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            toolbarDragRef.current = { mx: e.clientX, my: e.clientY, ox: toolbarOffset.x, oy: toolbarOffset.y };
-            setIsDraggingToolbar(true);
-          }}
-          onDoubleClick={() => setToolbarOffset({ x: 0, y: 0 })}
-          style={{
-            cursor: isDraggingToolbar ? 'grabbing' : 'grab',
-            fontSize: 12,
-            color: 'var(--soft)',
-            padding: '0 4px',
-            marginRight: 4,
-            lineHeight: 1,
-          }}
-        >
-          ⠿
-        </span>
-        {[
-          { label: 'B', action: () => editor.chain().focus().toggleBold().run(), active: editor.isActive('bold') },
-          { label: 'I', action: () => editor.chain().focus().toggleItalic().run(), active: editor.isActive('italic') },
-          { label: 'U', action: () => editor.chain().focus().toggleUnderline().run(), active: editor.isActive('underline') },
-          { label: 'S', action: () => editor.chain().focus().toggleStrike().run(), active: editor.isActive('strike') },
-        ].map((btn) => (
-          <TBtn key={btn.label} {...btn} />
-        ))}
-        <Div />
-        {[1, 2, 3].map((h) => (
-          <TBtn
-            key={h}
-            label={`H${h}`}
-            action={() => editor.chain().focus().toggleHeading({ level: h as 1 | 2 | 3 }).run()}
-            active={editor.isActive('heading', { level: h })}
-            small
-          />
-        ))}
-        <Div />
-        <TBtn label="≡" action={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} />
-        <TBtn label="①" action={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} />
-        <TBtn label='"' action={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} />
-        <TBtn label="<>" action={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} small />
-        <Div />
-        <TBtn label="—" action={() => editor.chain().focus().setHorizontalRule().run()} active={false} />
-      </div>
 
       <div
         className="editor-main"
@@ -1185,45 +1103,5 @@ const TocTreeItem = ({
     </>
   );
 };
-
-// ─── Toolbar helpers ─────────────────────────────────────────────────────────
-
-const Div = () => (
-  <div style={{ width: 0.5, height: 14, background: 'var(--border)', margin: '0 4px' }} />
-);
-
-const TBtn = ({
-  label,
-  action,
-  active,
-  small,
-}: {
-  label: string;
-  action: () => void;
-  active: boolean;
-  small?: boolean;
-}) => (
-  <motion.div
-    whileHover={{ scale: 1.1 }}
-    whileTap={{ scale: 0.92 }}
-    onClick={action}
-    style={{
-      width: 28,
-      height: 28,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 7,
-      fontSize: small ? 9 : 13,
-      fontWeight: 700,
-      cursor: 'pointer',
-      color: active ? 'var(--primary)' : 'var(--muted)',
-      background: active ? 'var(--primary-s)' : 'transparent',
-      transition: 'all 0.16s',
-    }}
-  >
-    {label}
-  </motion.div>
-);
 
 export default Editor;
